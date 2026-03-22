@@ -1,0 +1,40 @@
+services:
+  app:
+    build: .
+    container_name: epidauros_app
+    volumes:
+      - .:/app
+      - /app/.venv
+    ports:
+      - "8501:8501"
+    command: sleep infinity
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@db:5432/epidauros
+      - QDRANT_HOST=qdrant
+    depends_on:
+      - db
+      - qdrant
+
+  db:
+      image: postgres:17-alpine
+      container_name: epidauros_db
+      environment:
+        - POSTGRES_USER=postgres
+        - POSTGRES_PASSWORD=password
+        - POSTGRES_DB=epidauros
+      ports:
+        - "5432:5432"
+      volumes:
+        - postgres_data:/var/lib/postgresql/data
+
+  qdrant:
+    image: qdrant/qdrant:v1.13.2
+    container_name: epidauros_qdrant
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/var/lib/qdrant/storage
+
+volumes:
+  postgres_data:
+  qdrant_data:

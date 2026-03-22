@@ -1,14 +1,39 @@
 [project]
 name = "epidauros"
 version = "0.1.0"
-description = "Add your description here"
+description = "Scenario-based Casting System"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "instructor>=1.14.5",
-    "openai>=2.29.0",
-    "pydantic>=2.12.5",
-    "python-dotenv>=1.2.2",
-    "sparqlwrapper",
-    "wikipedia-api",
+    "pydantic>=2.10.0",
+    "networkx>=3.0",
+    "openai>=1.0.0",
+    "instructor>=1.14.0",
+    "python-dotenv>=1.0.0",
+    "fuzzywuzzy>=0.18.0",
+    "python-levenshtein>=0.23.0",
+    "streamlit>=1.55.0",
+    "pyvis>=0.3.2",
+    "psycopg2-binary>=2.9.11",
+    "qdrant-client>=1.17.1",
+    "langchain>=1.2.13",
+    "langgraph>=1.1.3",
+    "langchain-openapi>=0.1.1",
 ]
+
+[dependency-groups]
+# データセット作成用（Docker環境には入れない）
+dataset = [
+    "wikipedia-api>=0.6.0",
+    "sparqlwrapper>=2.0.0",
+    "beautifulsoup4>=4.12.0",
+    "requests>=2.31.0",
+    "tqdm>=4.66.0",
+]
+dev = [
+    "pytest>=8.0.0",
+    "ruff>=0.3.0",
+]
+
+[tool.uv]
+default-groups = []
