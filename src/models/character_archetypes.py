@@ -6,7 +6,7 @@
 
 from typing import Dict, List
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 
 class CharacterArchetype(BaseModel):
@@ -25,6 +25,8 @@ class CharacterArchetype(BaseModel):
     psychological_function: str
     # 物語を前進させるための機能
     dramatic_function: str
+
+    short_summary: str
 
     # アーキタイプの特徴
     core_traits: List[str]
@@ -61,6 +63,7 @@ HERO = CharacterArchetype(
         "5. Dealing with Death: Shows us how to face actual or symbolic death, "
         "proving it can be survived or transcended."
     ),
+    short_summary = "The active protagonist who drives the story, undergoes inner transformation, and sacrifices personal desires for a higher ideal.",
     # Core Traits derived from the text
     core_traits=[
         "Ego-Transcendence",
@@ -100,6 +103,7 @@ MENTOR = CharacterArchetype(
         "Note: The Mentor must often be outgrown or 'internalized' as a code of ethics for "
         "the Hero to reach the next stage of development."
     ),
+    short_summary = "A wise guide or parental surrogate who provides training, essential gifts, and motivation to prepare the hero for the journey.",
     # Core Traits derived from the text
     core_traits=[
         "The Self/Higher Aspirations",
@@ -139,6 +143,7 @@ THRESHOLD_GUARDIAN = CharacterArchetype(
         "is coming. They invite the Hero to see past surface impressions (the 'Stop' gesture) "
         "to the inner reality that welcomes the worthy."
     ),
+    short_summary = "Obstacles or lieutenants who test the hero's resolve and character, representing internal neuroses or external resistance to change.",
     # Core Traits derived from the text
     core_traits=[
         "Testing/Challenge",
@@ -176,6 +181,7 @@ HERALD = CharacterArchetype(
         "4. Versatility: The 'Herald mask' can be worn by anyone (Mentors, Villains, "
         "or even Allies) or manifested as a force of nature (storms, market crashes)."
     ),
+    short_summary = "A catalyst who delivers the 'call to adventure,' signaling that the status quo is no longer sustainable and change is imminent.",
     # Core Traits derived from the text
     core_traits=[
         "Call to Adventure",
@@ -216,6 +222,7 @@ SHAPESHIFTER = CharacterArchetype(
         "Heroes may become Shapeshifters to escape traps, and Villains may use "
         "it to trick the Hero."
     ),
+    short_summary = "An ambiguous character who creates doubt and suspense by shifting loyalties or appearances, mirroring the hero’s internal confusion.",
     # Core Traits derived from the text
     core_traits=[
         "Unreliability/Ambiguity",
@@ -257,6 +264,7 @@ SHADOW = CharacterArchetype(
         "5. Redemption/Vanquishing: External Shadows must be defeated, while internal "
         "Shadows can be redeemed by bringing them to consciousness."
     ),
+    short_summary = "A worthy opponent representing repressed psychoses or destructive potential; a dark mirror of the hero that must be defeated or redeemed.",
     # Core Traits derived from the text
     core_traits=[
         "Antagonism/Opposition",
@@ -296,6 +304,7 @@ ALLY = CharacterArchetype(
         "5. Humanizing the Hero: Allowing the Hero to express fear, ignorance, or "
         "vulnerability that might otherwise seem inappropriate for the 'Hero' mask."
     ),
+    short_summary = "Supportive companions who provide functional help, moral conscience, and humanize the hero by acting as an audience proxy.",
     # Core Traits derived from the text
     core_traits=[
         "Sidekick/Companion",
@@ -336,6 +345,7 @@ TRICKSTER = CharacterArchetype(
         "5. Versatility: Can be a Hero, a Sidekick/Ally to the Hero or Shadow, or "
         "even turn into a deadly Shadow/adversary (e.g., Loki)."
     ),
+    short_summary = "A subversive catalyst who provides comic relief and cuts big egos down to size, using mischief to challenge the status quo.",
     # Core Traits derived from the text
     core_traits=[
         "Mischief & Deceit",
