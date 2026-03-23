@@ -330,7 +330,9 @@ dependencies = [
     { name = "python-levenshtein" },
     { name = "pyvis" },
     { name = "qdrant-client" },
+    { name = "sparqlwrapper" },
     { name = "streamlit" },
+    { name = "wikipedia-api" },
 ]
 
 [package.dev-dependencies]
@@ -361,7 +363,9 @@ requires-dist = [
     { name = "python-levenshtein", specifier = ">=0.23.0" },
     { name = "pyvis", specifier = ">=0.3.2" },
     { name = "qdrant-client", specifier = ">=1.17.1" },
+    { name = "sparqlwrapper", specifier = ">=2.0.0" },
     { name = "streamlit", specifier = ">=1.55.0" },
+    { name = "wikipedia-api", specifier = ">=0.11.0" },
 ]
 
 [package.metadata.requires-dev]
