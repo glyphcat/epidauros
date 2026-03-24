@@ -5,6 +5,7 @@ description:
 このモジュールは、自然言語で与えられたシナリオ情報について以下の処理を行う。
 
 - 入力: あらすじ(text) + 配役(Actor/Roleペアのリスト)
+- プロンプト作成：グラフ構造抽出のためのプロンプトを組み立てる。
 - ノード同定: 配役リストの各人物を、8つの CharacterArchetype のいずれかに分類。
 - エッジ抽出: 人物間の関係を、36の SituationArchetype のいずれかに分類。
 - 出力: Pydanticでバリデーションされた、JSONB格納用の構造化データ。
@@ -45,12 +46,17 @@ class GraphGenerator:
             "\n",
         ]
 
-        # 1. キャラクターアーキタイプの定義
+        # 1. キャラクターアーキタイプの定義（アーキタイプ特定精度向上のため推奨シチュエーションを追加）
         lines.append("## Part 1: Character Archetype Definitions")
         for arch in ALL_CHARACTER_ARCHETYPES:
+            # related_dramatic_situations (例: [10, 22]) を SIT_10, SIT_22 の形式に変換
+            related_sits = ", ".join(
+                [f"SIT_{str(s).zfill(2)}" for s in arch.related_dramatic_situations]
+            )
             lines.append(f"- **{arch.id}**: {arch.short_summary}")
+            lines.append(f"  - Primary Situations: {related_sits}")
 
-        lines.append("\n") # セパレータ
+        lines.append("\n")
 
         # 2. シチュエーションアーキタイプの定義
         lines.append("## Part 2: Dramatic Situation Definitions")
@@ -70,13 +76,25 @@ class GraphGenerator:
         # 冒頭に固定定義（キャッシュ対象）を配置
         header = self._build_archetype_definition_header()
 
-        # 抽出指示（ここも固定テキストにする）
+        # 抽出指示
+        # キャラクターのPrimary Situationsを参考にしつつ、事実を優先するようガードレールを設置
         instruction = (
             "\n\n## Extraction Instructions\n"
             "Analyze the provided movie plot and cast information based on the definitions above.\n"
-            "1. Identify the most fitting CharacterArchetype for each actor.\n"
+
+            # --- 追加：ソースへの忠実性と孤立ノードの制約 ---
+            "### [CRITICAL RULE: SOURCE FIDELITY]\n"
+            "1. ONLY extract relationships and edges that are **explicitly described** in the provided 'Movie Plot'.\n"
+            "2. If a character in the 'Cast List' does NOT appear or has no direct interaction described in the Plot, they must remain as an **isolated node** (no edges connected to/from them).\n"
+            "3. DO NOT use external knowledge or general fame of the movie to 'fill in' missing interactions. If it's not in the text, it doesn't exist for this graph.\n\n"
+
+            # --- 既存の指示を整理・統合 ---
+            "### [Analysis Steps]\n"
+            "1. Identify the most fitting CharacterArchetype for each actor from the Cast List.\n"
             "2. Identify the SituationArchetypes that represent the relationships or key events between characters.\n"
-            "3. Output the result strictly in the specified JSON format matching the ScenarioGraph schema."
+            "   * Important Guideline: Refer to the 'Primary Situations' listed under each archetype as likely candidates, but the specific actions in the Plot ALWAYS take precedence.\n"
+            "3. For the 'reason' field in the edges, explicitly state the factual evidence from the plot that justifies the selected SituationArchetype.\n"
+            "4. Output the result strictly in the specified JSON format matching the ScenarioGraph schema."
         )
 
         # 動的部分（キャストリストとプロット）は必ず最後に配置
