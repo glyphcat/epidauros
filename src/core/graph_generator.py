@@ -15,6 +15,8 @@ from typing import Any, Dict, List
 
 from langchain_openai import ChatOpenAI
 
+# v2プロンプトの読み込みを追加
+from src.core.prompts.extract_scenario_graph import build_full_extraction_prompt
 from src.models.character_archetypes import ALL_CHARACTER_ARCHETYPES
 from src.models.scenario_structure import ScenarioGraph
 from src.models.situation_archetypes import ALL_SITUATIONS_ARCHETYPES
@@ -33,79 +35,17 @@ class GraphGenerator:
         # ScenarioGraphスキーマをLLMにバインドし、構造化出力を強制
         self.structured_llm = self.llm.with_structured_output(ScenarioGraph)
 
-    def _build_archetype_definition_header(self) -> str:
-        """
-        プロンプトキャッシュ効率を最大化するための固定ヘッダーを構築する。
-        1024トークン以上のボリュームを確保し、キャラクターとシチュエーションの定義を含める。
-        """
-        lines = [
-            "# SCENARIO ANALYSIS FRAMEWORK: ARCHETYPE DEFINITIONS",
-            "This framework uses Joseph Campbell's and Christopher Vogler's Hero's Journey archetypes ",
-            "combined with Georges Polti's 36 Dramatic Situations to analyze narrative structures.",
-            "The following definitions are fixed and must be used as the objective criteria for extraction.",
-            "\n",
+    def _build_archetypes_str(self) -> tuple[str, str]:
+        """プロンプト用のアーキタイプ文字列を生成"""
+        char_lines = [
+            f"- **{arch.id}**: {arch.short_summary}"
+            for arch in ALL_CHARACTER_ARCHETYPES
         ]
-
-        # 1. キャラクターアーキタイプの定義（アーキタイプ特定精度向上のため推奨シチュエーションを追加）
-        lines.append("## Part 1: Character Archetype Definitions")
-        for arch in ALL_CHARACTER_ARCHETYPES:
-            # related_dramatic_situations (例: [10, 22]) を SIT_10, SIT_22 の形式に変換
-            related_sits = ", ".join(
-                [f"SIT_{str(s).zfill(2)}" for s in arch.related_dramatic_situations]
-            )
-            lines.append(f"- **{arch.id}**: {arch.short_summary}")
-            lines.append(f"  - Primary Situations: {related_sits}")
-
-        lines.append("\n")
-
-        # 2. シチュエーションアーキタイプの定義
-        lines.append("## Part 2: Dramatic Situation Definitions")
-        for sit in ALL_SITUATIONS_ARCHETYPES:
-            # ID, 日本語名, ショートサマリーをセットで渡すことで抽出精度を高める
-            lines.append(f"- **{sit.id}** ({sit.name_jp}): {sit.short_summary}")
-
-        # これらを結合した文字列が1024トークンを超えている場合、
-        # 次回以降のリクエストでこの部分はキャッシュされ、料金と速度に貢献します。
-        return "\n".join(lines)
-
-    def _generate_extraction_prompt(self, plot_text: str, actor_list_str: str) -> str:
-        """
-        最終的な抽出プロンプトを組み立てる。
-        キャッシュ効率のため、[固定ヘッダー] -> [固定指示] -> [動的データ] の順序を厳守する。
-        """
-        # 冒頭に固定定義（キャッシュ対象）を配置
-        header = self._build_archetype_definition_header()
-
-        # 抽出指示
-        # キャラクターのPrimary Situationsを参考にしつつ、事実を優先するようガードレールを設置
-        instruction = (
-            "\n\n## Extraction Instructions\n"
-            "Analyze the provided movie plot and cast information based on the definitions above.\n"
-
-            # --- 追加：ソースへの忠実性と孤立ノードの制約 ---
-            "### [CRITICAL RULE: SOURCE FIDELITY]\n"
-            "1. ONLY extract relationships and edges that are **explicitly described** in the provided 'Movie Plot'.\n"
-            "2. If a character in the 'Cast List' does NOT appear or has no direct interaction described in the Plot, they must remain as an **isolated node** (no edges connected to/from them).\n"
-            "3. DO NOT use external knowledge or general fame of the movie to 'fill in' missing interactions. If it's not in the text, it doesn't exist for this graph.\n\n"
-
-            # --- 既存の指示を整理・統合 ---
-            "### [Analysis Steps]\n"
-            "1. Identify the most fitting CharacterArchetype for each actor from the Cast List.\n"
-            "2. Identify the SituationArchetypes that represent the relationships or key events between characters.\n"
-            "   * Important Guideline: Refer to the 'Primary Situations' listed under each archetype as likely candidates, but the specific actions in the Plot ALWAYS take precedence.\n"
-            "3. For the 'reason' field in the edges, explicitly state the factual evidence from the plot that justifies the selected SituationArchetype.\n"
-            "4. Output the result strictly in the specified JSON format matching the ScenarioGraph schema."
-        )
-
-        # 動的部分（キャストリストとプロット）は必ず最後に配置
-        # これにより、上記までのヘッダーと指示がキャッシュヒットの対象になります。
-        data_section = (
-            f"\n\n## Input Data\n"
-            f"### Cast List\n{actor_list_str}\n\n"
-            f"### Movie Plot to Analyze\n{plot_text}"
-        )
-
-        return header + instruction + data_section
+        sit_lines = [
+            f"- **{sit.id}** ({sit.name_jp}): {sit.short_summary}"
+            for sit in ALL_SITUATIONS_ARCHETYPES
+        ]
+        return "\n".join(char_lines), "\n".join(sit_lines)
 
     def generate(
         self, title: str, plot_text: str, cast_mapping: List[Dict[str, Any]]
@@ -113,26 +53,65 @@ class GraphGenerator:
         """
         与えられた作品情報からグラフ構造を生成する。
         """
-        # プロンプト用にキャストリストを整形
-        actor_list_str = "\n".join(
-            [
-                f"- Actor: {c['actor']}, Role: {c.get('role', 'Unknown')}"
-                for c in cast_mapping
-            ]
+        # --- 1. 前処理：メンションマッピングとあらすじの置換 ---
+        mention_mapping = {}
+        isolated_casts = []
+        processed_plot = plot_text
+        active_mentions = []
+
+        for i, cast in enumerate(cast_mapping):
+            mention_id = f"$char_{i+1}"
+            role_name = cast.get("role", "Unknown")
+            actor_name = cast.get("actor", "Unknown")
+
+            # あらすじに役名が含まれるか確認（簡易的な文字列マッチ）
+            if role_name != "Unknown" and role_name in processed_plot:
+                processed_plot = processed_plot.replace(role_name, mention_id)
+                mention_mapping[mention_id] = {
+                    "role": role_name,
+                    "actor": actor_name,
+                    "original_cast": cast,
+                }
+                active_mentions.append(f"- {mention_id} (Actor: {actor_name})")
+            else:
+                isolated_casts.append(cast)
+
+        actor_list_str = (
+            "\n".join(active_mentions)
+            if active_mentions
+            else "No characters found in plot."
         )
 
-        # 固定ヘッダーを含むフルプロンプトを生成
-        # PromptTemplateを使わず直接文字列を組み立てることでキャッシュ順序を制御
-        full_prompt = self._generate_extraction_prompt(plot_text, actor_list_str)
+        # --- 2. プロンプト生成 ---
+        char_arch_str, sit_arch_str = self._build_archetypes_str()
+        full_prompt = build_full_extraction_prompt(
+            character_archetypes_str=char_arch_str,
+            situation_archetypes_str=sit_arch_str,
+            actor_list_str=actor_list_str,
+            plot_text=processed_plot,
+        )
 
         try:
-            # 構造化出力LLMを直接呼び出し
-            # これにより、PromptTemplateの変数埋め込みによる順序破綻を防ぎます
+            # --- 3. LLM呼び出し ---
             result = self.structured_llm.invoke(full_prompt)
+            graph = (
+                result
+                if isinstance(result, ScenarioGraph)
+                else ScenarioGraph.model_validate(result)
+            )
 
-            if isinstance(result, ScenarioGraph):
-                return result
-            return ScenarioGraph.model_validate(result)
+            # --- 4. 後処理：メンションの復元と孤立ノードの結合 ---
+            for node in graph.nodes:
+                # LLMは `role_name` に $char_1 等を出力する前提
+                mention = node.role_name
+                if mention in mention_mapping:
+                    node.role_name = mention_mapping[mention]["role"]
+                    node.actor_name = mention_mapping[mention]["actor"]
+
+            # TODO: 孤立ノード（isolated_casts）を graph.nodes に追加する処理
+            # Nodeモデルの定義に合わせて追加してください（例: graph.nodes.append(Node(...))）
+
+            return graph
         except Exception as e:
             print(f"Error during graph extraction for '{title}': {e}")
             raise e
