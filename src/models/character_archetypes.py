@@ -63,7 +63,7 @@ HERO = CharacterArchetype(
         "5. Dealing with Death: Shows us how to face actual or symbolic death, "
         "proving it can be survived or transcended."
     ),
-    short_summary = "The active protagonist who drives the story, undergoes inner transformation, and sacrifices personal desires for a higher ideal.",
+    short_summary="The active protagonist who drives the story, undergoes inner transformation, and sacrifices personal desires for a higher ideal.",
     # Core Traits derived from the text
     core_traits=[
         "Ego-Transcendence",
@@ -74,8 +74,8 @@ HERO = CharacterArchetype(
         "Transformation/Arc",
         "Dealing with Mortality",
     ],
-    # Related Situations based on 'Sacrifice', 'Growth', and 'Trial'
-    related_dramatic_situations=[10, 22, 28, 33],
+    # Related Situations: 9=Daring Enterprise, 20=Self-Sacrifice for an Ideal, 28=Obstacles to Love, 31=Conflict with a God
+    related_dramatic_situations=[9, 20, 28, 31],
 )
 
 MENTOR = CharacterArchetype(
@@ -103,7 +103,7 @@ MENTOR = CharacterArchetype(
         "Note: The Mentor must often be outgrown or 'internalized' as a code of ethics for "
         "the Hero to reach the next stage of development."
     ),
-    short_summary = "A wise guide or parental surrogate who provides training, essential gifts, and motivation to prepare the hero for the journey.",
+    short_summary="A wise guide or parental surrogate who provides training, essential gifts, and motivation to prepare the hero for the journey.",
     # Core Traits derived from the text
     core_traits=[
         "The Self/Higher Aspirations",
@@ -114,8 +114,8 @@ MENTOR = CharacterArchetype(
         "Shamanic Guide",
         "Internalized Ethics (Inner Mentor)",
     ],
-    # Related Situations based on functions like 'Rescue', 'Riddle', 'Sacrifice'
-    related_dramatic_situations=[1, 10, 11, 22, 36],
+    # Related Situations: 2=Deliverance (Rescue), 11=Enigma, 20=Self-Sacrifice for an Ideal
+    related_dramatic_situations=[2, 11, 20],
 )
 
 THRESHOLD_GUARDIAN = CharacterArchetype(
@@ -143,7 +143,7 @@ THRESHOLD_GUARDIAN = CharacterArchetype(
         "is coming. They invite the Hero to see past surface impressions (the 'Stop' gesture) "
         "to the inner reality that welcomes the worthy."
     ),
-    short_summary = "Obstacles or lieutenants who test the hero's resolve and character, representing internal neuroses or external resistance to change.",
+    short_summary="Obstacles or lieutenants who test the hero's resolve and character, representing internal neuroses or external resistance to change.",
     # Core Traits derived from the text
     core_traits=[
         "Testing/Challenge",
@@ -154,13 +154,12 @@ THRESHOLD_GUARDIAN = CharacterArchetype(
         "Surface Appearance vs. Inner Reality",
         "Incorporation (Taking into the body)",
     ],
-    # Related Situations based on 'Testing', 'Disguise', and 'Riddles'
-    # (Situations: 9=Daring Enterprise, 11=Enigma, etc.)
-    related_dramatic_situations=[9, 11, 15],
+    # Related Situations: 9=Daring Enterprise (Test of Strength), 11=Enigma (Test of Wit)
+    related_dramatic_situations=[9, 11],
 )
 
 HERALD = CharacterArchetype(
-    id="HEROLD",
+    id="HERALD",
     name_jp="使者（ヘラルド）",
     # Psychological Function: Call for Change
     psychological_function=(
@@ -181,7 +180,7 @@ HERALD = CharacterArchetype(
         "4. Versatility: The 'Herald mask' can be worn by anyone (Mentors, Villains, "
         "or even Allies) or manifested as a force of nature (storms, market crashes)."
     ),
-    short_summary = "A catalyst who delivers the 'call to adventure,' signaling that the status quo is no longer sustainable and change is imminent.",
+    short_summary="A catalyst who delivers the 'call to adventure,' signaling that the status quo is no longer sustainable and change is imminent.",
     # Core Traits derived from the text
     core_traits=[
         "Call to Adventure",
@@ -192,9 +191,8 @@ HERALD = CharacterArchetype(
         "Herald Mask (Flexible Role)",
         "Challenge/Opportunity Provider",
     ],
-    # Related Situations based on 'Adventure', 'Enigma', and 'News'
-    # (Situations: 10=Abduction/Adventure, 11=Enigma, etc.)
-    related_dramatic_situations=[10, 11, 12],
+    # Related Situations: 9=Daring Enterprise (Call to Adventure), 11=Enigma (Unsolved Mystery)
+    related_dramatic_situations=[9, 11],
 )
 
 SHAPESHIFTER = CharacterArchetype(
@@ -222,7 +220,7 @@ SHAPESHIFTER = CharacterArchetype(
         "Heroes may become Shapeshifters to escape traps, and Villains may use "
         "it to trick the Hero."
     ),
-    short_summary = "An ambiguous character who creates doubt and suspense by shifting loyalties or appearances, mirroring the hero’s internal confusion.",
+    short_summary="An ambiguous character who creates doubt and suspense by shifting loyalties or appearances, mirroring the hero’s internal confusion.",
     # Core Traits derived from the text
     core_traits=[
         "Unreliability/Ambiguity",
@@ -233,9 +231,8 @@ SHAPESHIFTER = CharacterArchetype(
         "Mirroring the Hero's Desires/Fears",
         "The Fatale Aspect (Lethal Attraction)",
     ],
-    # Related Situations based on 'Adultery', 'Betrayal', 'Enigma'
-    # (Situations: 4=Vengeance for Crime, 18=Involuntary Crimes of Love, 24=Rivalry of Kinsmen)
-    related_dramatic_situations=[4, 11, 18, 24, 33],
+    # Related Situations: 11=Enigma, 18=Involuntary Crimes of Love, 24=Rivalry of Kinsmen, 33=Erroneous Judgment
+    related_dramatic_situations=[11, 18, 24, 33],
 )
 
 SHADOW = CharacterArchetype(
@@ -264,7 +261,7 @@ SHADOW = CharacterArchetype(
         "5. Redemption/Vanquishing: External Shadows must be defeated, while internal "
         "Shadows can be redeemed by bringing them to consciousness."
     ),
-    short_summary = "A worthy opponent representing repressed psychoses or destructive potential; a dark mirror of the hero that must be defeated or redeemed.",
+    short_summary="A worthy opponent representing repressed psychoses or destructive potential; a dark mirror of the hero that must be defeated or redeemed.",
     # Core Traits derived from the text
     core_traits=[
         "Antagonism/Opposition",
@@ -275,9 +272,8 @@ SHADOW = CharacterArchetype(
         "Self-Justified (The 'Right Man')",
         "Redeemability (Potential for Transformation)",
     ],
-    # Related Situations based on 'Vengeance', 'Crime', and 'Madness'
-    # (Situations: 3=Crime Pursued by Vengeance, 4=Vengeance for Crime, 16=Madness)
-    related_dramatic_situations=[3, 4, 16, 33],
+    # Related Situations: 3=Crime Pursued by Vengeance, 5=Pursuit, 30=Ambition, 34=Remorse
+    related_dramatic_situations=[3, 5, 30, 34],
 )
 
 ALLY = CharacterArchetype(
@@ -304,7 +300,7 @@ ALLY = CharacterArchetype(
         "5. Humanizing the Hero: Allowing the Hero to express fear, ignorance, or "
         "vulnerability that might otherwise seem inappropriate for the 'Hero' mask."
     ),
-    short_summary = "Supportive companions who provide functional help, moral conscience, and humanize the hero by acting as an audience proxy.",
+    short_summary="Supportive companions who provide functional help, moral conscience, and humanize the hero by acting as an audience proxy.",
     # Core Traits derived from the text
     core_traits=[
         "Sidekick/Companion",
@@ -315,9 +311,8 @@ ALLY = CharacterArchetype(
         "Comic Foil",
         "Loyalty & Reliability",
     ],
-    # Related Situations based on 'Rescue', 'Friendship', and 'Inquiry'
-    # (Situations: 1=Rescue, 11=Enigma, 14=Rivalry of Loved Ones)
-    related_dramatic_situations=[1, 11, 14, 25],
+    # Related Situations: 1=Supplication (Seeking Help), 2=Deliverance (Support), 21=Self-Sacrifice for Kindred
+    related_dramatic_situations=[1, 2, 21],
 )
 
 TRICKSTER = CharacterArchetype(
@@ -345,7 +340,7 @@ TRICKSTER = CharacterArchetype(
         "5. Versatility: Can be a Hero, a Sidekick/Ally to the Hero or Shadow, or "
         "even turn into a deadly Shadow/adversary (e.g., Loki)."
     ),
-    short_summary = "A subversive catalyst who provides comic relief and cuts big egos down to size, using mischief to challenge the status quo.",
+    short_summary="A subversive catalyst who provides comic relief and cuts big egos down to size, using mischief to challenge the status quo.",
     # Core Traits derived from the text
     core_traits=[
         "Mischief & Deceit",
@@ -356,8 +351,7 @@ TRICKSTER = CharacterArchetype(
         "Perspective Provider",
         "Boundary Crosser",
     ],
-    # Related Situations based on 'Enigma', 'Rivalry', and 'Madness'
-    # (Situations: 11=Enigma, 13=Enmity of Kinsmen, 16=Madness, 32=Mistaken Jealousy)
+    # Related Situations: 11=Enigma, 13=Enmity of Kinsmen, 16=Madness, 32=Mistaken Jealousy
     related_dramatic_situations=[11, 13, 16, 32],
 )
 
