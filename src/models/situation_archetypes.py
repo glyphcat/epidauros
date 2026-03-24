@@ -545,7 +545,7 @@ SIT_36 = SituationArchetype(
 )
 
 # --- 3. Collection for Global Access ---
-ALL_SITUATIONS: List[SituationArchetype] = [
+ALL_SITUATIONS_ARCHETYPES: List[SituationArchetype] = [
     eval(f"SIT_{str(i).zfill(2)}") for i in range(1, 37)
 ]
 
