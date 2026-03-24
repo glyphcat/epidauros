@@ -8,9 +8,12 @@ services:
     ports:
       - "8501:8501"
     command: sleep infinity
+    env_file:
+      - .env
     environment:
       - DATABASE_URL=postgresql://postgres:password@db:5432/epidauros
       - QDRANT_HOST=qdrant
+      - PYTHONPATH=/app
     depends_on:
       - db
       - qdrant
@@ -26,6 +29,7 @@ services:
         - "5432:5432"
       volumes:
         - postgres_data:/var/lib/postgresql/data
+        # - ./db/schema.sql:/docker-entrypoint-initdb.d/init.sql:ro
 
   qdrant:
     image: qdrant/qdrant:v1.13.2
