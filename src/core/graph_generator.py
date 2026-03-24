@@ -11,6 +11,7 @@ description:
 - 出力: Pydanticでバリデーションされた、JSONB格納用の構造化データ。
 """
 
+import re
 from typing import Any, Dict, List
 
 from langchain_openai import ChatOpenAI
@@ -18,7 +19,7 @@ from langchain_openai import ChatOpenAI
 # v2プロンプトの読み込みを追加
 from src.core.prompts.extract_scenario_graph import build_full_extraction_prompt
 from src.models.character_archetypes import ALL_CHARACTER_ARCHETYPES
-from src.models.scenario_structure import ScenarioGraph
+from src.models.scenario_structure import CharacterNode, ScenarioGraph
 from src.models.situation_archetypes import ALL_SITUATIONS_ARCHETYPES
 
 
@@ -60,7 +61,8 @@ class GraphGenerator:
         active_mentions = []
 
         for i, cast in enumerate(cast_mapping):
-            mention_id = f"$char_{i+1}"
+            # $c{number} 形式に固定
+            mention_id = f"$c{i+1}"
             role_name = cast.get("role", "Unknown")
             actor_name = cast.get("actor", "Unknown")
 
@@ -101,15 +103,32 @@ class GraphGenerator:
             )
 
             # --- 4. 後処理：メンションの復元と孤立ノードの結合 ---
+            # 抽出されたノードのメンションを元の名前に復元
             for node in graph.nodes:
-                # LLMは `role_name` に $char_1 等を出力する前提
                 mention = node.role_name
                 if mention in mention_mapping:
                     node.role_name = mention_mapping[mention]["role"]
                     node.actor_name = mention_mapping[mention]["actor"]
 
-            # TODO: 孤立ノード（isolated_casts）を graph.nodes に追加する処理
-            # Nodeモデルの定義に合わせて追加してください（例: graph.nodes.append(Node(...))）
+            # 重複を避けるための次の連番IDを取得
+            existing_ids = []
+            for n in graph.nodes:
+                match = re.search(r"\d+", n.node_id)
+                if match:
+                    existing_ids.append(int(match.group()))
+            next_id_num = max(existing_ids) + 1 if existing_ids else 1
+
+            # 孤立ノード（あらすじ未登場キャラ）をグラフに追加
+            for cast in isolated_casts:
+                isolated_node = CharacterNode(
+                    node_id=f"char_{next_id_num:02d}",  # CharacterNodeのバリデータに合わせた形式
+                    role_name=cast.get("role", "Unknown"),
+                    actor_name=cast.get("actor", "Unknown"),
+                    archetype_id="UNKNOWN",  # アーキタイプ定義に存在しない場合は適宜変更してください
+                    description="Not explicitly mentioned in the plot summary.",
+                )
+                graph.nodes.append(isolated_node)
+                next_id_num += 1
 
             return graph
         except Exception as e:
