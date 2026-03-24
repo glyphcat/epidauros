@@ -355,6 +355,20 @@ TRICKSTER = CharacterArchetype(
     related_dramatic_situations=[11, 13, 16, 32],
 )
 
+# シナリオ内で言及されないキャラクターを表現するための特殊ID
+NOT_MENTIONED = CharacterArchetype(
+    id="NOT_MENTIONED",
+    name_jp="シナリオ未言及",
+    # Psychological Function: Enemy of the Status Quo and Ego-Leveler
+    psychological_function=("Unknown"),
+    # Dramatic Function: Comic Relief and Catalyst
+    dramatic_function=("Unknown"),
+    short_summary="Character present in cast list but not mentioned in the analyzed plot summary.",
+    # Core Traits derived from the text
+    core_traits=[],
+    related_dramatic_situations=[],
+)
+
 
 # --- 3. Collection for Global Access ---
 ALL_CHARACTER_ARCHETYPES: List[CharacterArchetype] = [
@@ -371,3 +385,5 @@ ALL_CHARACTER_ARCHETYPES: List[CharacterArchetype] = [
 CHARACTER_ARCHETYPES_DICT: Dict[str, CharacterArchetype] = {
     archetype.id: archetype for archetype in ALL_CHARACTER_ARCHETYPES
 }
+
+NOT_MENTIONED_ARCHETYPE_ID = "NOT_MENTIONED"
