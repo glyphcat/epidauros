@@ -18,7 +18,10 @@ from langchain_openai import ChatOpenAI
 
 # v2プロンプトの読み込みを追加
 from src.core.prompts.extract_scenario_graph import build_full_extraction_prompt
-from src.models.character_archetypes import ALL_CHARACTER_ARCHETYPES
+from src.models.character_archetypes import (
+    ALL_CHARACTER_ARCHETYPES,
+    NOT_MENTIONED_ARCHETYPE_ID,
+)
 from src.models.scenario_structure import CharacterNode, ScenarioGraph
 from src.models.situation_archetypes import ALL_SITUATIONS_ARCHETYPES
 
@@ -104,12 +107,15 @@ class GraphGenerator:
 
             # --- 4. 後処理：メンションの復元と孤立ノードの結合 ---
             # 抽出されたノードのメンションを元の名前に復元
+            extracted_roles = set()
             for node in graph.nodes:
                 mention = node.role_name
                 if mention in mention_mapping:
                     node.role_name = mention_mapping[mention]["role"]
                     node.actor_name = mention_mapping[mention]["actor"]
+                    extracted_roles.add(node.role_name)
 
+            # node_idの連番管理
             # 重複を避けるための次の連番IDを取得
             existing_ids = []
             for n in graph.nodes:
@@ -119,16 +125,18 @@ class GraphGenerator:
             next_id_num = max(existing_ids) + 1 if existing_ids else 1
 
             # 孤立ノード（あらすじ未登場キャラ）をグラフに追加
-            for cast in isolated_casts:
-                isolated_node = CharacterNode(
-                    node_id=f"char_{next_id_num:02d}",  # CharacterNodeのバリデータに合わせた形式
-                    role_name=cast.get("role", "Unknown"),
-                    actor_name=cast.get("actor", "Unknown"),
-                    archetype_id="UNKNOWN",  # アーキタイプ定義に存在しない場合は適宜変更してください
-                    description="Not explicitly mentioned in the plot summary.",
-                )
-                graph.nodes.append(isolated_node)
-                next_id_num += 1
+            for cast in cast_mapping:
+                role = cast.get("role", "Unknown")
+                if role not in extracted_roles:
+                    isolated_node = CharacterNode(
+                        node_id=f"char_{next_id_num:02d}",
+                        role_name=role,
+                        actor_name=cast.get("actor", "Unknown"),
+                        archetype_id=NOT_MENTIONED_ARCHETYPE_ID,
+                        description="Character present in cast list but not mentioned in the analyzed plot summary.",
+                    )
+                    graph.nodes.append(isolated_node)
+                    next_id_num += 1
 
             return graph
         except Exception as e:
