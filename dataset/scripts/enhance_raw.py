@@ -15,7 +15,7 @@ if not TMDB_READ_TOKEN:
     print("エラー: 環境変数 'TMDB_READ_TOKEN' が設定されていません。")
     sys.exit(1)
 
-TMDB_BASE_URL = "https://api.themovihedb.org/3"
+TMDB_BASE_URL = "https://api.themoviedb.org/3"
 HEADERS = {"accept": "application/json", "Authorization": f"Bearer {TMDB_READ_TOKEN}"}
 
 
@@ -85,6 +85,9 @@ def main():
             time.sleep(0.1)  # APIレートリミット配慮
             continue
 
+        # TMDBのIDをexternal_id として追加
+        movie["external_id"] = f"tmdb_{tmdb_id}"
+
         # 2. TMDBから詳細情報とキャストを取得
         tmdb_data = get_tmdb_details_and_credits(tmdb_id)
         if not tmdb_data:
@@ -122,9 +125,13 @@ def main():
             ]:
                 continue
 
+            # 俳優のTMDB IDを取得
+            actor_id = cast.get("id")
+
             new_cast_mapping.append(
                 {
                     "actor": cast.get("name"),
+                    "external_id": f"tmdb_{actor_id}" if actor_id else None,
                     "role": role_name,
                     "guarantee_rank": get_rank(cast.get("order", 99)),
                 }

@@ -1,5 +1,6 @@
 import json
 import time
+import urllib.parse
 from pathlib import Path
 from typing import List, TypedDict, cast
 
@@ -7,7 +8,7 @@ import wikipediaapi
 from SPARQLWrapper import JSON, SPARQLWrapper
 
 # --- 設定 ---
-USER_AGENT = "MovieCastAgentCollector/1.1 (your-email@example.com)"
+USER_AGENT = "EpidaurosDataCollector/1.0 (glyphcat13@gmail.com)"
 WIKI_LANG = "en"
 
 
@@ -22,6 +23,7 @@ class SparqlRow(TypedDict, total=False):
     year: SparqlBinding
     boxOffice: SparqlBinding
     title: SparqlBinding
+    wikiTitle: SparqlBinding  # 追加: Wikipediaの正確な記事名
     directorLabel: SparqlBinding
     genreLabel: SparqlBinding
     actorName: SparqlBinding
@@ -40,13 +42,25 @@ def get_sparql_results(query: str) -> List[SparqlRow]:
     sparql = SPARQLWrapper("https://query.wikidata.org/sparql")
     sparql.setQuery(query)
     sparql.setReturnFormat(JSON)
-    try:
-        raw = sparql.query().convert()
-        data = cast(SparqlResponse, raw)
-        return data["results"]["bindings"]
-    except Exception as e:
-        print(f"SPARQL Error: {e}")
-        return []
+    sparql.agent = USER_AGENT
+
+    for attempt in range(3):
+        try:
+            raw = sparql.query().convert()
+            data = cast(SparqlResponse, raw)
+            return data["results"]["bindings"]
+        except Exception as e:
+            if "429" in str(e) or "Too Many Requests" in str(e):
+                wait_time = (attempt + 1) * 15
+                print(
+                    f"\n[429 Too Many Requests] {wait_time}秒待機して再試行します... ({attempt + 1}/3)"
+                )
+                time.sleep(wait_time)
+            else:
+                print(f"SPARQL Error: {e}")
+                time.sleep(5)
+
+    return []
 
 
 def sparql_value(row: SparqlRow, key: str) -> str:
@@ -56,88 +70,119 @@ def sparql_value(row: SparqlRow, key: str) -> str:
     return binding.get("value", "")
 
 
-def main():
-    wiki = wikipediaapi.Wikipedia(USER_AGENT, WIKI_LANG)
-    movie_list = []
-    # ターゲット年代（母数確保のため範囲を調整）
-    decades = [(1960, 1980), (1980, 2000), (2000, 2027)]
-
+def get_movie_base_list() -> List[dict]:
     print("Step 1: Wikidataから映画リスト（母体）を取得中...")
-    for start, end in decades:
-        # 興行収入をOPTIONALにし、Wikipedia英語版がある米国映画を抽出
+    all_movies = []
+    seen = set()
+
+    periods = [(1960, 1980), (1981, 2000), (2001, 2025)]
+
+    for start_year, end_year in periods:
+        # 重複排除で減る分を見越して SPARQL側では2000件要求する
         query = f"""
-        SELECT DISTINCT ?movie ?wikipediaTitle ?year WHERE {{
-          ?movie wdt:P31 wd:Q11424; wdt:P495 wd:Q30; wdt:P577 ?date.
-          BIND(YEAR(?date) AS ?year)
-          FILTER(?year >= {start} && ?year < {end})
-          ?article schema:about ?movie; schema:isPartOf <https://en.wikipedia.org/>; schema:name ?wikipediaTitle.
-        }} ORDER BY DESC(?year) LIMIT 1000
+        SELECT DISTINCT ?movie ?year ?title ?wikiTitle WHERE {{
+          ?movie wdt:P31 wd:Q11424.
+          ?movie wdt:P577 ?date.
+          BIND(YEAR(?date) AS ?year).
+          FILTER(?year >= {start_year} && ?year <= {end_year})
+
+          ?movie rdfs:label ?title.
+          FILTER(LANG(?title) = "en").
+
+          ?sitelink schema:about ?movie;
+                    schema:isPartOf <https://en.wikipedia.org/>.
+          # WikipediaのURLから正確な記事名を抽出
+          BIND(REPLACE(STR(?sitelink), "https://en.wikipedia.org/wiki/", "") AS ?wikiTitle)
+        }}
+        LIMIT 2000
         """
+        print(f"  > {start_year}-{end_year}: ", end="", flush=True)
         results = get_sparql_results(query)
-        movie_list.extend(results)
-        print(f"  > {start}-{end}: {len(results)}件取得")
-        time.sleep(1)
 
+        period_movies = []
+        for r in results:
+            qid = sparql_value(r, "movie").split("/")[-1]
+
+            # まだ追加されていないユニークな作品だけを処理
+            if qid not in seen:
+                seen.add(qid)
+
+                # URLエンコードされた文字（%20など）を元に戻す
+                raw_wiki = sparql_value(r, "wikiTitle")
+                wiki_title = urllib.parse.unquote(raw_wiki)
+
+                period_movies.append(
+                    {
+                        "qid": qid,
+                        "title": sparql_value(r, "title"),
+                        "year": sparql_value(r, "year"),
+                        "wiki_title": wiki_title,  # 正確なWikipediaタイトルを保持
+                    }
+                )
+
+            # 各年代、ぴったり1200件取得できた時点でループを終了
+            if len(period_movies) >= 1200:
+                break
+
+        print(f"ユニーク {len(period_movies)}件確保")
+        all_movies.extend(period_movies)
+
+    return all_movies
+
+
+def main():
+    wiki = wikipediaapi.Wikipedia(user_agent=USER_AGENT, language=WIKI_LANG)
+    movie_list = get_movie_base_list()
+
+    print(f"\nStep 2: 詳細データとWikipedia本文を収集（全 {len(movie_list)} 件）...")
     final_dataset = []
-    print(f"Step 2: 詳細データとWikipedia本文を収集（全 {len(movie_list)} 件）...")
 
-    for i, item in enumerate(movie_list):
-        m_uri = sparql_value(item, "movie")
-        w_title = sparql_value(item, "wikipediaTitle")
-        if not m_uri or not w_title:
-            continue
+    for i, m in enumerate(movie_list):
+        qid = m["qid"]
+        title = m["title"]
+        year_str = m["year"]
+        wiki_title = m.get("wiki_title", title)  # 取得した正確なタイトルを使用
 
-        # 詳細メタデータ取得（BoxOfficeは後で外部API補完するためここではOPTIONAL）
-        detail_query = f"""
-        SELECT ?title ?year ?boxOffice ?directorLabel ?genreLabel WHERE {{
-          BIND(<{m_uri}> AS ?m)
-          ?m rdfs:label ?title. FILTER(LANG(?title) = "en")
-          ?m wdt:P577 ?date. BIND(YEAR(?date) AS ?year)
-          OPTIONAL {{ ?m wdt:P2142 ?boxOffice. }}
-          OPTIONAL {{ ?m wdt:P57 ?dir. ?dir rdfs:label ?directorLabel. FILTER(LANG(?directorLabel) = "en") }}
-          OPTIONAL {{ ?m wdt:P136 ?gen. ?gen rdfs:label ?genreLabel. FILTER(LANG(?genreLabel) = "en") }}
+        details_query = f"""
+        SELECT ?directorLabel ?genreLabel WHERE {{
+          VALUES ?movie {{ wd:{qid} }}
+          OPTIONAL {{ ?movie wdt:P57 ?director. ?director rdfs:label ?directorLabel. FILTER(LANG(?directorLabel) = "en") }}
+          OPTIONAL {{ ?movie wdt:P136 ?genre. ?genre rdfs:label ?genreLabel. FILTER(LANG(?genreLabel) = "en") }}
         }}
         """
-        details = get_sparql_results(detail_query)
-        if not details:
-            continue
-        title = sparql_value(details[0], "title")
-        year_str = sparql_value(details[0], "year")
-        box_office_str = sparql_value(details[0], "boxOffice")
-        if not title or not year_str:
-            continue
+        details = get_sparql_results(details_query)
 
-        # Wikipediaページ取得
-        page = wiki.page(w_title)
-        if not page.exists():
-            continue
-
-        # セクション取得（名称の揺れに対応）
-        def get_sec_text(titles):
-            for t in titles:
-                sec = page.section_by_title(t)
-                if sec:
-                    return sec.text
-            return ""
-
-        plot_text = get_sec_text(["Plot", "Synopsis", "Story", "Summary"])
-        cast_text = get_sec_text(["Cast", "Characters", "Casting"])
-
-        # キャスト情報の構築（Wikidataのキャストをベースにするが、N/A排除は次工程で実施）
         cast_query = f"""
         SELECT ?actorName ?roleName WHERE {{
-          <{m_uri}> p:P161 ?s.
-          ?s ps:P161 ?actor. ?actor rdfs:label ?actorName. FILTER(LANG(?actorName) = "en")
-          OPTIONAL {{ ?s pq:P453 ?role. ?role rdfs:label ?roleName. FILTER(LANG(?roleName) = "en") }}
+          VALUES ?movie {{ wd:{qid} }}
+          ?movie p:P161 ?statement.
+          ?statement ps:P161 ?actor.
+          ?actor rdfs:label ?actorName.
+          FILTER(LANG(?actorName) = "en").
+          OPTIONAL {{ ?statement pq:P453 ?role. ?role rdfs:label ?roleName. FILTER(LANG(?roleName) = "en") }}
         }}
         """
         casts = get_sparql_results(cast_query)
 
+        # 曖昧なタイトルではなく、正確な記事名で検索するため確実にヒットする
+        page = wiki.page(wiki_title)
+        if not page.exists():
+            continue
+
+        plot_text = ""
+        sections = page.sections
+        for s in sections:
+            if s.title.lower() in ["plot", "synopsis", "story"]:
+                plot_text = s.text
+                break
+        if not plot_text:
+            plot_text = page.summary
+
         movie_entry = {
             "title": title,
             "metadata": {
-                "year": int(year_str),
-                "box_office": (float(box_office_str) if box_office_str else None),
+                "year": int(year_str) if year_str else 0,
+                "box_office": 0,
                 "directors": list(
                     set(
                         sparql_value(d, "directorLabel")
@@ -152,6 +197,7 @@ def main():
                         if "genreLabel" in g
                     )
                 ),
+                "wikidata_id": qid,  # 既存のデータ構造を維持
             },
             "cast_mapping": [
                 {
@@ -160,22 +206,24 @@ def main():
                 }
                 for c in casts
             ],
-            "cast_hints_raw": cast_text,
-            "lead_text": page.summary,
             "plot_full": plot_text,
-            "low_quality_flag": len(plot_text) < 500 or not cast_text,
+            "low_quality_flag": len(plot_text) < 500 or not casts,
         }
 
         final_dataset.append(movie_entry)
         if (i + 1) % 50 == 0:
-            print(f"進捗: {i+1}/{len(movie_list)} 完了")
-        time.sleep(0.5)
+            print(f"進捗: {i+1}/{len(movie_list)} 完了 (現在 {len(final_dataset)} 件)")
+            fp = Path(__file__).parent.parent.resolve() / "raw_dataset.json"
+            with open(fp, "w", encoding="utf-8") as f:
+                json.dump(final_dataset, f, ensure_ascii=False, indent=2)
 
-    # 保存
+        time.sleep(1.0)
+
     fp = Path(__file__).parent.parent.resolve() / "raw_dataset.json"
     with open(fp, "w", encoding="utf-8") as f:
         json.dump(final_dataset, f, ensure_ascii=False, indent=2)
-    print(f"\n完了: {len(final_dataset)}件のデータを保存しました。")
+
+    print(f"\n取得完了: {len(final_dataset)} 件を保存しました。")
 
 
 if __name__ == "__main__":
