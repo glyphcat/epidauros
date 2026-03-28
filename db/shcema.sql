@@ -34,6 +34,9 @@ CREATE TABLE works (
     setting_period TEXT,
     setting_location TEXT,
 
+    -- Qdrant上の参照ID。プロット構造の類似度検索用
+    plot_embedding_id UUID,
+
     -- LLMで抽出するシナリオグラフ構造の格納用
     scenario_graph_data JSONB,
 
@@ -58,7 +61,7 @@ CREATE TABLE performances (
     success_score NUMERIC(6, 5),
 
     -- Qdrant上の参照ID。キャラクターの性質による類似検索用
-    vector_point_id UUID,
+    character_vector_id UUID,
 
     -- 36の劇的場面のID。1つの役柄に複数の要素が混ざるため配列として定義(例：["SIT_12"])
     related_situation_ids TEXT[],
