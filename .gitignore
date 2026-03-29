@@ -183,4 +183,4 @@ cython_debug/
 
 # dataset json
 dataset/**.json
-dataset/**.jsonl
+data/
