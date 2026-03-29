@@ -72,10 +72,16 @@ class RelationEdge(BaseModel):
 
 class ScenarioGraph(BaseModel):
     """
-    シナリオ全体のグラフ構造
+    シナリオ全体のグラフ構造及び関連メタデータ
     """
 
     scenario_title: str = Field(..., description="作品タイトル")
+    setting_period: str = Field(
+        ..., description="時代設定（例: '19th Century England', 'Near Future', 'Contemporary', 'Unknown'）"
+    )
+    setting_location: str = Field(
+        ..., description="舞台設定（例: 'London', 'Deep Space', 'New York City', 'Unknown'）"
+    )
     nodes: List[CharacterNode] = Field(
         ..., description="主要登場人物（ノード）のリスト"
     )
