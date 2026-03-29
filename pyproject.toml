@@ -22,6 +22,8 @@ dependencies = [
     "wikipedia-api>=0.11.0",
     "sparqlwrapper>=2.0.0",
     "sqlalchemy>=2.0.48",
+    "streamlit-agraph>=0.0.45",
+    "pandas>=2.3.3",
 ]
 
 [dependency-groups]
