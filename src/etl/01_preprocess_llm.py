@@ -94,6 +94,7 @@ def run_extraction(max_records: int = None):
                         "external_id": ext_id,
                         "title": title,
                         "metadata": item.get("metadata", {}),
+                        "plot_full": plot_text,
                         "setting_period": getattr(graph_result, "setting_period", "Unknown"),
                         "setting_location": getattr(graph_result, "setting_location", "Unknown"),
                         "scenario_graph_data": graph_result.model_dump(),
