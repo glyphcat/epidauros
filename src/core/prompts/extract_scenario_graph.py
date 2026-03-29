@@ -36,7 +36,8 @@ EXTRACTION_STEPS_PROMPT = """
 2. [Edge Extraction]: Identify the most significant dramatic relationships between the characters. Assign each relationship to ONE fitting "Situation Archetype" (from the 36 Dramatic Situations).
    * Important: Refer to the "Related Situations" under each Character Archetype as hints, but the specific actions in the Plot ALWAYS take precedence.
 3. [Evidence/Reason]: For the 'reason' field in edges, you MUST explicitly cite evidence from the plot using the character IDs (e.g., "$char_1 sacrificed themselves for $char_2").
-4. [Language Consistency]: Even if the input plot is in Japanese, provide the `description` and `reason` fields in English.
+4. [Setting]: Extract the `setting_period` (time period, e.g. "19th Century England", "Near Future") and `setting_location` (e.g. "London", "Deep Space"). If not mentioned, infer reasonably or put "Unknown".
+5. [Language Consistency]: Even if the input plot is in Japanese, provide the `description`, `reason`, `setting_period`, and `setting_location` fields in English.
 """
 
 # -------------------------------------------------------------------
