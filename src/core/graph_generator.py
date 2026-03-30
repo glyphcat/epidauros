@@ -52,10 +52,11 @@ class GraphGenerator:
         return "\n".join(char_lines), "\n".join(sit_lines)
 
     def generate(
-        self, title: str, plot_text: str, cast_mapping: List[Dict[str, Any]]
+        self, title: str, plot_text: str, cast_mapping: List[Dict[str, Any]], pre_mentioned: bool = False
     ) -> ScenarioGraph:
         """
         与えられた作品情報からグラフ構造を生成する。
+        pre_mentioned=True の場合、plot_text には既に $c1 などのIDが埋め込まれている前提で処理する。
         """
         # --- 1. 前処理：メンションマッピングとあらすじの置換 ---
         mention_mapping = {}
@@ -64,22 +65,33 @@ class GraphGenerator:
         active_mentions = []
 
         for i, cast in enumerate(cast_mapping):
-            # $c{number} 形式に固定
-            mention_id = f"$c{i+1}"
+            mention_id = cast.get("id", f"$c{i+1}")
             role_name = cast.get("role", "Unknown")
             actor_name = cast.get("actor", "Unknown")
 
-            # あらすじに役名が含まれるか確認（簡易的な文字列マッチ）
-            if role_name != "Unknown" and role_name in processed_plot:
-                processed_plot = processed_plot.replace(role_name, mention_id)
-                mention_mapping[mention_id] = {
-                    "role": role_name,
-                    "actor": actor_name,
-                    "original_cast": cast,
-                }
-                active_mentions.append(f"- {mention_id} (Actor: {actor_name})")
+            if pre_mentioned:
+                # UIから直接 $c1 などが入れられている場合
+                if mention_id in processed_plot:
+                    mention_mapping[mention_id] = {
+                        "role": role_name,
+                        "actor": actor_name,
+                        "original_cast": cast,
+                    }
+                    active_mentions.append(f"- {mention_id} (Role: {role_name}, Actor: {actor_name})")
+                else:
+                    isolated_casts.append(cast)
             else:
-                isolated_casts.append(cast)
+                # 従来の自然言語置換方式
+                if role_name != "Unknown" and role_name in processed_plot:
+                    processed_plot = processed_plot.replace(role_name, mention_id)
+                    mention_mapping[mention_id] = {
+                        "role": role_name,
+                        "actor": actor_name,
+                        "original_cast": cast,
+                    }
+                    active_mentions.append(f"- {mention_id} (Actor: {actor_name})")
+                else:
+                    isolated_casts.append(cast)
 
         actor_list_str = (
             "\n".join(active_mentions)
