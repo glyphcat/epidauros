@@ -56,6 +56,23 @@ def get_tmdb_details_and_credits(movie_id: int) -> dict:
         return response.json()
     return {}
 
+# 俳優情報のメモリキャッシュ
+actor_person_cache = {}
+
+def get_tmdb_person_details(person_id: int) -> dict:
+    """TMDBから特定の俳優の詳細（性別、生年月日）を取得"""
+    if person_id in actor_person_cache:
+        return actor_person_cache[person_id]
+        
+    url = f"{TMDB_BASE_URL}/person/{person_id}"
+    params = {"language": "en-US"}
+    response = requests.get(url, headers=HEADERS, params=params)
+    if response.status_code == 200:
+        data = response.json()
+        actor_person_cache[person_id] = data
+        return data
+    return {}
+
 
 def main():
     if not INPUT_FILE.exists():
@@ -125,13 +142,25 @@ def main():
             ]:
                 continue
 
-            # 俳優のTMDB IDを取得
+            # 俳優のTMDB IDを取得して追加情報を引く
             actor_id = cast.get("id")
+            gender = cast.get("gender") # 0: unspec, 1: female, 2: male, 3: non-binary
+            birth_date = None
+            
+            if actor_id:
+                person_data = get_tmdb_person_details(actor_id)
+                if person_data:
+                    birth_date = person_data.get("birthday")
+                    # もしcredits側にgenderが0(未定義)で入っててperson側に正しくあるなら上書き
+                    if not gender and person_data.get("gender"):
+                        gender = person_data.get("gender")
 
             new_cast_mapping.append(
                 {
                     "actor": cast.get("name"),
                     "external_id": f"tmdb_{actor_id}" if actor_id else None,
+                    "gender": gender,
+                    "birth_date": birth_date,
                     "role": role_name,
                     "guarantee_rank": get_rank(cast.get("order", 99)),
                 }
