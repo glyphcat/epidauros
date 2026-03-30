@@ -8,6 +8,8 @@ CREATE TABLE actors (
     name TEXT NOT NULL,
     -- TMDBのIDなど。インポート時の同姓同名・同一人物判定の根拠として使用
     external_id TEXT UNIQUE,
+    gender INTEGER,
+    birth_date DATE,
     -- ギャランティスコア。直近作品のキャスティング順から想定し、加重平均で算出。
     current_guarantee_score NUMERIC(6, 5),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
