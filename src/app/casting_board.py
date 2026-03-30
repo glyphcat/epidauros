@@ -25,9 +25,11 @@ if "casting_results" not in st.session_state:
     st.session_state.casting_results = None
 if "char_list" not in st.session_state:
     st.session_state.char_list = [
-        {"id": "$c1", "role": "主人公", "suggest_casting": True, "already_cast": ""},
-        {"id": "$c2", "role": "賢者", "suggest_casting": True, "already_cast": ""}
+        {"id": "$c1", "role": "主人公", "target_gender": "Any", "target_age": "Any", "suggest_casting": True, "already_cast": ""},
+        {"id": "$c2", "role": "賢者", "target_gender": "Any", "target_age": "Any", "suggest_casting": True, "already_cast": ""}
     ]
+if "fb_log" not in st.session_state:
+    st.session_state.fb_log = {}
 
 # --- Visualization Function ---
 def render_graph(graph):
@@ -36,14 +38,14 @@ def render_graph(graph):
     
     # ユーザーリクエストに合わせて全体を黒・オレンジ・グレーを基調としたクールな配色に変更
     color_map = {
-        "HERO": "#FF7F00",                # 鮮やかなオレンジ
-        "MENTOR": "#FFA500",              # オレンジ
-        "SHADOW": "#333333",              # 黒/ダークグレー
-        "ALLY": "#FFB347",                # パステル系オレンジ
-        "HERALD": "#FFCC80",              # 淡いオレンジ
-        "THRESHOLD_GUARDIAN": "#CC6600",  # 深めのオレンジ
-        "SHAPESHIFTER": "#E68A00",        # 黄土色がかったオレンジ
-        "TRICKSTER": "#B37400",           # 暗めのブラウンオレンジ
+        "HERO": "#1E90FF",                # ドジャーブルー（主人公らしい青）
+        "MENTOR": "#32CD32",              # ライムグリーン（導き手）
+        "SHADOW": "#FF4500",              # オレンジレッド（敵役の緊張感）
+        "ALLY": "#87CEFA",                # ライトスカイブルー（相棒）
+        "HERALD": "#DA70D6",              # オーキッド（使者）
+        "THRESHOLD_GUARDIAN": "#708090",  # スレートグレー（門番）
+        "SHAPESHIFTER": "#FFD700",        # ゴールド（変幻自在）
+        "TRICKSTER": "#FF69B4",           # ホットピンク（トリックスター）
         "NOT_MENTIONED": "#555555"        # グレー
     }
     
@@ -51,9 +53,9 @@ def render_graph(graph):
         color = color_map.get(n.archetype_id, "#bdc3c7")
         nodes.append(Node(
             id=n.node_id,
-            label=f"{n.role_name}\n({n.archetype_id})",
+            label=f"{n.role_name} ({n.archetype_id})",
             title=n.description,
-            size=25,
+            size=20,
             color=color,
             shape="dot"
         ))
@@ -64,17 +66,26 @@ def render_graph(graph):
             label=e.situation_id, 
             target=e.target_node_id,
             title=e.reason,
-            color="#FF9900" 
+            color="#FF9900",
+            width=2
         ))
         
     config = Config(
         width='100%',
-        height=500,
+        height=600,
         directed=True,
         physics=True,
         hierarchical=False,
         nodeHighlightBehavior=True,
-        highlightColor="#FFB347"
+        highlightColor="#FFB347",
+        collapsible=False,
+        node={'labelProperty': 'label', 'renderLabel': True},
+        link={'renderLabel': True, 'labelProperty': 'label'},
+        # 力学の設定を微調整して重なりを防止
+        min_velocity=0.75,
+        max_velocity=100.0,
+        solver='repulsion',
+        repulsion={'nodeDistance': 200, 'centralGravity': 0.1, 'springLength': 200, 'springConstant': 0.05}
     )
     
     return agraph(nodes=nodes, edges=edges, config=config)
@@ -83,107 +94,110 @@ def render_graph(graph):
 tab1, tab2, tab3 = st.tabs(["1. Scenario Setup", "2. Character Graph", "3. Casting Proposals"])
 
 with tab1:
-    col_plot, col_cast = st.columns([1.2, 1])
+    st.subheader("Characters List", help="登場人物の定義一覧です。キャスティング提案が欲しいキャラクターは「Suggest?」にチェックを入れます。ここで性別・年代を指定すると、結果から外れた俳優を【完全除外】できます。")
+    st.caption("登場人物を定義し、検索時の物理的なハードフィルター（性別・年齢層）を指定します。（※指定なし=Any）")
     
-    with col_plot:
-        st.subheader("Story Plot", help="物語のあらすじを入力します。右の「Characters List」に登録した名前が入力されると、下部にリアルタイムでプレビューハイライトが表示されます。")
-        title_input = st.text_input("Project Title", value="Untitled Project")
-        
-        plot_input = st.text_area(
-            "Plot Text (入力欄外をクリックすると下部のLive Previewへ即座に反映されます)", 
-            height=250,
-            value="主人公 は平和な農村に暮らす若者。ある日、賢者 が現れ、主人公 に秘められた力があることを伝える。"
-        )
-        
-        st.caption("Live Preview")
-        preview_text = plot_input
-        # 色分け定義
-        colors = ["#FF4B4B", "#1E90FF", "#32CD32", "#FF9800", "#9C27B0", "#E91E63", "#00BCD4", "#FFC107"]
-        
-        for i, char in enumerate(st.session_state.char_list):
-            role = char['role']
-            if not role:
-                continue
-            
-            # Suggest対象かどうかで色を変える（対象外はグレー）
-            bg_color = colors[i % len(colors)] if char['suggest_casting'] else "#555555"
-            preview_text = preview_text.replace(role, f'<span style="background-color:{bg_color}; color:white; padding:2px 6px; border-radius:4px; font-weight:bold;">{role}</span>')
-            
-        st.markdown(f'<div style="padding:15px; border:1px solid #444; border-radius:5px; background-color:#1e1e1e; min-height:100px; line-height:1.6;">{preview_text}</div>', unsafe_allow_html=True)
-        
-    with col_cast:
-        st.subheader("Characters List", help="登場人物の定義一覧です。AIからの配役提案が欲しいキャラクターは「Suggest?」にチェックを入れてください。")
-        st.caption("登場人物を定義し、キャスティング提案の要否を指定します。")
-        
-        # --- 超強力なカスタムCSS注入 ---
-        st.markdown("""
-        <style>
-        /* 1. 行間の徹底的な圧縮 (Gapゼロ化 ＆ マージン削減) */
-        div[data-testid="column"]:has(.char-list-container) div[data-testid="stVerticalBlock"] {
-            gap: 0px !important;
-        }
-        div[data-testid="column"]:has(.char-list-container) div[data-testid="stHorizontalBlock"] {
-            gap: 2px !important;
-            margin-bottom: -15px !important;
-            align-items: end !important; /* マイナスボタンを下揃えにし、テキストボックスと縦位置を合わせる */
-        }
-        div[data-testid="column"]:has(.char-list-container) .stTextInput,
-        div[data-testid="column"]:has(.char-list-container) .stCheckbox {
-            margin-bottom: 0px !important;
-        }
+    # --- 超強力なカスタムCSS注入 ---
+    st.markdown("""
+    <style>
+    /* 1. 行間の徹底的な圧縮 (Gapゼロ化 ＆ マージン削減) */
+    div[data-testid="column"]:has(.char-list-container) div[data-testid="stVerticalBlock"] {
+        gap: 0px !important;
+    }
+    div[data-testid="column"]:has(.char-list-container) div[data-testid="stHorizontalBlock"] {
+        gap: 2px !important;
+        margin-bottom: -15px !important;
+        align-items: end !important; /* マイナスボタンを下揃えにし、縦位置を合わせる */
+    }
+    div[data-testid="column"]:has(.char-list-container) .stTextInput,
+    div[data-testid="column"]:has(.char-list-container) .stSelectbox,
+    div[data-testid="column"]:has(.char-list-container) .stCheckbox {
+        margin-bottom: 0px !important;
+    }
 
-        /* 2. ベーススタイル: リストコンテナ内のSecondaryボタンはすべて【赤色（➕ボタン用）】にする */
-        html body div[data-testid="column"]:has(.char-list-container) button[kind="secondary"] {
-            background-color: #FF4B4B !important;
-            color: white !important;
-            border: none !important;
-            width: 32px !important;
-            min-height: 32px !important;
-            height: 32px !important;
-            padding: 0px !important;
-            margin-top: 10px !important; /* 表本体から少し離す */
-        }
+    /* 2. ベーススタイル: リストコンテナ内のSecondaryボタンはすべて【赤色（➕ボタン用）】にする */
+    html body div[data-testid="column"]:has(.char-list-container) button[kind="secondary"] {
+        background-color: #FF4B4B !important;
+        color: white !important;
+        border: none !important;
+        width: 32px !important;
+        min-height: 32px !important;
+        height: 32px !important;
+        padding: 0px !important;
+        margin-top: 10px !important; /* 表本体から少し離す */
+    }
 
-        /* 3. 上書きスタイル: 横並びブロック（行）の中にあるSecondaryボタンは【青色（➖ボタン用）】にする */
-        html body div[data-testid="column"]:has(.char-list-container) div[data-testid="stHorizontalBlock"] button[kind="secondary"] {
-            background-color: #1E90FF !important;
-            margin-top: 0px !important;
-            margin-bottom: 8px !important; /* テキストボックスの高さとの微細なズレを調整 */
-        }
-        </style>
-        """, unsafe_allow_html=True)
-        st.markdown('<div class="char-list-container" style="display:none;"></div>', unsafe_allow_html=True)
+    /* 3. 上書きスタイル: 横並びブロック（行）の中にあるSecondaryボタンは【青色（➖ボタン用）】にする */
+    html body div[data-testid="column"]:has(.char-list-container) div[data-testid="stHorizontalBlock"] button[kind="secondary"] {
+        background-color: #1E90FF !important;
+        margin-top: 0px !important;
+        margin-bottom: 8px !important; /* テキストボックスの高さとの微細なズレを調整 */
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    st.markdown('<div class="char-list-container" style="display:none;"></div>', unsafe_allow_html=True)
+    
+    # 表のヘッダー風レイアウト (項目を増やしたため配分変更)
+    h_cols = st.columns([1, 2.5, 1.5, 1.5, 1.2, 2.5, 0.8])
+    h_cols[0].markdown("**ID**", help="識別記号")
+    h_cols[1].markdown("**Character Name**", help="キャラクターの名前や役職")
+    h_cols[2].markdown("**Gender**", help="キャラクターの性別。")
+    h_cols[3].markdown("**Age**", help="キャラクターの年齢。")
+    h_cols[4].markdown("**Suggest?**", help="AIの提案を求める場合はチェック。")
+    h_cols[5].markdown("**Already Cast**", help="決まっている場合は俳優名。")
+    
+    gender_options = ["Any", "Female", "Male", "Non-binary"]
+    age_options = ["Any", "Teen", "20s", "30s", "40s", "50s", "60s+"]
+    
+    # 各行の描画
+    for i, char in enumerate(st.session_state.char_list):
+        cols = st.columns([1, 2.5, 1.5, 1.5, 1.2, 2.5, 0.8])
+        cols[0].text_input("id", value=char["id"], disabled=True, key=f"id_{i}", label_visibility="collapsed")
+        char["role"] = cols[1].text_input("role", value=char["role"], key=f"role_{i}", label_visibility="collapsed")
+        char["target_gender"] = cols[2].selectbox("gender", options=gender_options, index=gender_options.index(char.get("target_gender", "Any")), key=f"gen_{i}", label_visibility="collapsed")
+        char["target_age"] = cols[3].selectbox("age", options=age_options, index=age_options.index(char.get("target_age", "Any")), key=f"age_{i}", label_visibility="collapsed")
+        char["suggest_casting"] = cols[4].checkbox("Yes", value=char["suggest_casting"], key=f"sugg_{i}")
+        char["already_cast"] = cols[5].text_input("already", value=char["already_cast"], key=f"cast_{i}", label_visibility="collapsed")
         
-        # 表のヘッダー風レイアウト
-        h_cols = st.columns([1.5, 3, 2, 3, 1])
-        h_cols[0].markdown("**ID**", help="プロット本文でこのキャラクターを呼び出すための記号です。")
-        h_cols[1].markdown("**Character Name**", help="キャラクターの名前や役職を入力します。")
-        h_cols[2].markdown("**Suggest?**", help="このキャラクターに対してAIのキャスティング提案を求める場合はチェックを入れます。")
-        h_cols[3].markdown("**Already Cast**", help="既に配役が決定している場合、その俳優名を入力します（AIはこれに基づいてバランスを取ります）。")
-        
-        # 各行の描画
-        for i, char in enumerate(st.session_state.char_list):
-            cols = st.columns([1.5, 3, 2, 3, 1])
-            cols[0].text_input("id", value=char["id"], disabled=True, key=f"id_{i}", label_visibility="collapsed")
-            char["role"] = cols[1].text_input("role", value=char["role"], key=f"role_{i}", label_visibility="collapsed")
-            char["suggest_casting"] = cols[2].checkbox("Yes", value=char["suggest_casting"], key=f"sugg_{i}")
-            char["already_cast"] = cols[3].text_input("already", value=char["already_cast"], key=f"cast_{i}", label_visibility="collapsed")
-            
-            # 削除ボタン
-            if cols[4].button("➖", key=f"del_{i}"):
-                st.session_state.char_list.pop(i)
-                st.rerun()
-                
-        # 追加ボタン (※StreamlitのテーマCSS干渉を避けるため、typeをPrimaryからあえて外す)
-        if st.button("➕", key="add_char"):
-            next_id = f"$c{len(st.session_state.char_list) + 1}"
-            st.session_state.char_list.append(
-                {"id": next_id, "role": "", "suggest_casting": True, "already_cast": ""}
-            )
+        # 削除ボタン
+        if cols[6].button("➖", key=f"del_{i}"):
+            st.session_state.char_list.pop(i)
             st.rerun()
             
-        # Analysis用に df 形式に変換しておく
-        edited_df = pd.DataFrame(st.session_state.char_list)
+    # 追加ボタン
+    if st.button("➕", key="add_char"):
+        next_id = f"$c{len(st.session_state.char_list) + 1}"
+        st.session_state.char_list.append(
+            {"id": next_id, "role": "", "target_gender": "Any", "target_age": "Any", "suggest_casting": True, "already_cast": ""}
+        )
+        st.rerun()
+        
+    # Analysis用に df 形式に変換しておく
+    edited_df = pd.DataFrame(st.session_state.char_list)
+    
+    st.divider()
+    
+    st.subheader("Story Plot", help="物語のあらすじを入力します。上の「Characters List」に登録した名前が入力されると、下部にリアルタイムでプレビューハイライトが表示されます。")
+    title_input = st.text_input("Project Title", value="Untitled Project")
+    
+    plot_input = st.text_area(
+        "Plot Text (入力欄外をクリックすると下部のLive Previewへ即座に反映されます)", 
+        height=250,
+        value="主人公 は平和な農村に暮らす若者。ある日、賢者 が現れ、主人公 に秘められた力があることを伝える。"
+    )
+    
+    st.caption("Live Preview")
+    preview_text = plot_input
+    colors = ["#FF4B4B", "#1E90FF", "#32CD32", "#FF9800", "#9C27B0", "#E91E63", "#00BCD4", "#FFC107"]
+    
+    for i, char in enumerate(st.session_state.char_list):
+        role = char['role']
+        if not role:
+            continue
+        bg_color = colors[i % len(colors)] if char['suggest_casting'] else "#555555"
+        preview_text = preview_text.replace(role, f'<span style="background-color:{bg_color}; color:white; padding:2px 6px; border-radius:4px; font-weight:bold;">{role}</span>')
+        
+    st.markdown(f'<div style="padding:15px; border:1px solid #444; border-radius:5px; background-color:#1e1e1e; min-height:100px; line-height:1.6;">{preview_text}</div>', unsafe_allow_html=True)
         
     st.divider()
     
@@ -286,7 +300,25 @@ with tab3:
                 rationale = data.get("rationale", "")
                 
                 if rationale:
-                    st.info(f"💡 **AI Agent Recommendation Rationale:**\\n\\n{rationale}")
+                    st.info(f"💡 **AI Agent Recommendation Rationale:**\n\n{rationale}")
+                    
+                    # --- NEW: User Feedback Section ---
+                    with st.expander("📝 Provide Feedback for this casting", expanded=False):
+                        col_fb1, col_fb2 = st.columns([1, 1])
+                        with col_fb1:
+                            eval_val = st.radio(f"Overall satisfaction?", ["Great!", "Hmm...", "Need adjustment"], key=f"eval_{role_label}", horizontal=True)
+                        with col_fb2:
+                            note_val = st.text_area("Specific comments / suggestions", key=f"note_{role_label}", placeholder="e.g. Needs to be more cynical.")
+                        
+                        if st.button("Submit Feedback", key=f"save_{role_label}"):
+                            st.session_state.fb_log[role_label] = {"rating": eval_val, "note": note_val}
+                            st.success(f"Feedback submitted for '{role_label}'!")
+                    
+                    if role_label in st.session_state.fb_log:
+                        fb = st.session_state.fb_log[role_label]
+                        st.markdown(f"> **Your Feedback:** {fb['rating']} - *{fb['note']}*")
+                    
+                    st.divider()
                 
                 if not candidates:
                     st.warning("条件に合致する俳優が見つかりませんでした。")
