@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, Numeric, Text, ARRAY, DateTime, ForeignKey, text
+from sqlalchemy import Column, String, Integer, Numeric, Text, ARRAY, DateTime, Date, ForeignKey, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 from src.core.database import Base
@@ -9,6 +9,8 @@ class Actor(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
     name = Column(Text, nullable=False)
     external_id = Column(Text, unique=True)
+    gender = Column(Integer)  # TMDB spec: 0=Not set/spec, 1=Female, 2=Male, 3=Non-binary
+    birth_date = Column(Date)
     current_guarantee_score = Column(Numeric(6, 5))
     created_at = Column(DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"))
     updated_at = Column(DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), onupdate=text("CURRENT_TIMESTAMP"))
@@ -49,6 +51,8 @@ class Performance(Base):
     target_situation_ids = Column(ARRAY(Text))
     created_at = Column(DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"))
     updated_at = Column(DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), onupdate=text("CURRENT_TIMESTAMP"))
+
+    __table_args__ = (UniqueConstraint('work_id', 'actor_id', 'character_name', name='uq_perf_work_actor_char'),)
 
     work = relationship("Work", back_populates="performances")
     actor = relationship("Actor", back_populates="performances")

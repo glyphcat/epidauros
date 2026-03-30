@@ -11,6 +11,8 @@ class MetadataSchema(BaseModel):
 class CastMappingSchema(BaseModel):
     actor: str
     external_id: str
+    gender: Optional[int] = None
+    birth_date: Optional[str] = None
     role: str
     guarantee_rank: Optional[str] = None
 

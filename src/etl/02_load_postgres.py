@@ -86,12 +86,16 @@ def load_data(db: Session, limit: int = None, dry_run: bool = False):
                 actor_stmt = insert(Actor).values(
                     name=cast_data.actor,
                     external_id=cast_data.external_id,
+                    gender=cast_data.gender,
+                    birth_date=cast_data.birth_date,
                     current_guarantee_score=0.0 # Will be updated in Phase 3
                 )
                 actor_stmt = actor_stmt.on_conflict_do_update(
                     index_elements=['external_id'],
                     set_={
                         'name': actor_stmt.excluded.name,
+                        'gender': actor_stmt.excluded.gender,
+                        'birth_date': actor_stmt.excluded.birth_date,
                         'updated_at': func.now()
                     }
                 ).returning(Actor.id)
