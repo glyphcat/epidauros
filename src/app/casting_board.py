@@ -71,31 +71,39 @@ def render_graph(graph):
         ))
         
     config = Config(
-        width='100%',
+        width=1200,
         height=600,
         directed=True,
         physics=True,
         hierarchical=False,
         nodeHighlightBehavior=True,
         highlightColor="#FFB347",
-        collapsible=False,
-        node={'labelProperty': 'label', 'renderLabel': True},
-        link={'renderLabel': True, 'labelProperty': 'label'},
-        # 力学の設定を微調整して重なりを防止
-        min_velocity=0.75,
-        max_velocity=100.0,
+        # 物理シミュレーションを強化して中心に集まるように調整
+        repulsion={'nodeDistance': 200, 'centralGravity': 0.3, 'springLength': 200, 'springConstant': 0.05},
         solver='repulsion',
-        repulsion={'nodeDistance': 200, 'centralGravity': 0.1, 'springLength': 200, 'springConstant': 0.05}
     )
     
     return agraph(nodes=nodes, edges=edges, config=config)
 
 # --- Main Layout ---
-tab1, tab2, tab3 = st.tabs(["1. Scenario Setup", "2. Character Graph", "3. Casting Proposals"])
+tab1, tab2, tab3 = st.tabs(["1. Scenario Setup", "2. Scenario Graph", "3. Casting Proposals"])
 
 with tab1:
-    st.subheader("Characters List", help="登場人物の定義一覧です。キャスティング提案が欲しいキャラクターは「Suggest?」にチェックを入れます。ここで性別・年代を指定すると、結果から外れた俳優を【完全除外】できます。")
-    st.caption("登場人物を定義し、検索時の物理的なハードフィルター（性別・年齢層）を指定します。（※指定なし=Any）")
+    col_t1, col_t2 = st.columns([4, 1])
+    with col_t1:
+        st.subheader("Characters List", help="登場人物の定義一覧です。キャスティング提案が欲しいキャラクターは「Suggest?」にチェックを入れます。")
+    with col_t2:
+        if st.button("🗑️ Clear All", help="Clear all inputs, graphs, and casting results."):
+            st.session_state.scenario_graph = None
+            st.session_state.casting_results = None
+            st.session_state.fb_log = {}
+            st.session_state.char_list = [
+                {"id": "$c1", "role": "主人公", "target_gender": "Any", "target_age": "Any", "suggest_casting": True, "already_cast": ""},
+                {"id": "$c2", "role": "賢者", "target_gender": "Any", "target_age": "Any", "suggest_casting": True, "already_cast": ""}
+            ]
+            st.rerun()
+
+    st.caption("登場人物を定義してください。各種属性（性別・年齢層）を入力した場合、キャスティングの参考情報として使用されます。（※指定なし=Any）")
     
     # --- 超強力なカスタムCSS注入 ---
     st.markdown("""
@@ -278,13 +286,42 @@ with tab1:
 # --- Tab 2: Graph ---
 with tab2:
     if st.session_state.scenario_graph:
-        st.subheader("Narrative Structure")
-        render_graph(st.session_state.scenario_graph)
+        st.subheader("Scenario Graph")
+        graph_obj = st.session_state.scenario_graph
         
-        with st.expander("Raw Graph JSON Data"):
+        st.markdown("##### 🕸️ Narrative Structure")
+        if not graph_obj.nodes:
+            st.warning("グラフにノードが見つかりませんでした。プロットとキャラクター設定を確認してください。")
+        else:
+            try:
+                render_graph(graph_obj)
+            except Exception as e:
+                st.error(f"グラフ描画中にエラーが発生しました: {e}")
+                st.info("以下にRaw JSON データを表示します。")
+                
+        # --- Character Archetypes Table ---
+        st.markdown("##### 👥 Extracted Characters")
+        char_data = [
+            {"Name": n.role_name, "Archetype": n.archetype_id, "Description": n.description}
+            for n in graph_obj.nodes
+        ]
+        st.table(char_data)
+        
+        with st.expander("🔍 Raw Graph JSON Data", expanded=False):
             st.json(st.session_state.scenario_graph.model_dump())
     else:
         st.info("「1. Scenario Setup」タブで「Analyze Graph & Generate Casting Proposals」を実行してください。")
+
+    # --- Footer Reference: 36 Dramatic Situations (Always at bottom) ---
+    st.divider()
+    from src.models.situation_archetypes import ALL_SITUATIONS_ARCHETYPES
+    with st.expander("📚 Reference: 36 Dramatic Situations (SIT_xx)", expanded=False):
+        sit_data = [
+            {"ID": s.id, "Name": s.name_jp, "Summary": s.short_summary}
+            for s in ALL_SITUATIONS_ARCHETYPES
+        ]
+        st.table(sit_data)
+
 
 # --- Tab 3: Proposals ---
 with tab3:
