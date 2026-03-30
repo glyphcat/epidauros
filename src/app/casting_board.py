@@ -16,7 +16,7 @@ st.set_page_config(page_title="Epidauros AI Casting Agent", layout="wide", page_
 st.title("🎬 Epidauros (AI-Casting Board Agent)")
 st.markdown("""
 シナリオやプロットを入力し、登場人物の関係性を抽出して最適なキャストを提案するAIボードです。
-**あらすじ本文では、役名ではなく $c1, $c2 といったIDを使って人物間の関係を記述してください。**
+**あらすじ本文では、役名ではなく `$c1`, `$c2` といったIDを使って人物間の関係を記述してください。**
 """)
 
 # --- State Init ---
@@ -82,7 +82,7 @@ with tab1:
     col_plot, col_cast = st.columns([1.2, 1])
     
     with col_plot:
-        st.subheader("Story Plot")
+        st.subheader("Story Plot", help="物語のあらすじを入力します。AIが関係性を正確に抽出できるよう、具体的な役名ではなく「$c1 は $c2 を裏切った」のようにID記法を用いて記述してください。")
         title_input = st.text_input("Project Title", value="Untitled Project")
         plot_input = st.text_area(
             "Plot Text", 
@@ -92,7 +92,7 @@ with tab1:
         )
         
     with col_cast:
-        st.subheader("Characters List")
+        st.subheader("Characters List", help="登場人物の定義一覧です。AIからの配役提案が欲しいキャラクターは「Suggest?」にチェックを入れてください。")
         st.caption("登場人物を定義し、キャスティング提案の要否を指定します。")
         
         # --- 超強力なカスタムCSS注入 ---
@@ -174,14 +174,32 @@ with tab1:
         
     st.divider()
     
-    with st.expander("Casting Constraints", expanded=True):
-        col_c1, col_c2, col_c3 = st.columns(3)
-        with col_c1:
-            weight_sim = st.slider("Match Score Weight", 0.0, 1.0, 1.0, 0.1)
-        with col_c2:
-            weight_succ = st.slider("Success Score Weight", 0.0, 1.0, 0.5, 0.1)
-        with col_c3:
-            guarantee_range = st.slider("Guarantee Score Range", 0.0, 1.0, (0.0, 1.0), 0.05)
+    with st.expander("Casting Preferences", expanded=True):
+        st.info("💡 候補を絞り込むための物理的な条件（Constraints）と、AIに期待する提案の方向性（Intentions）を設定します。")
+        st.markdown("##### Constraints", help="検索候補から完全に条件外の俳優を除外するための「物理的な制約」です。")
+        # スライダーを半分程度の長さに短く見せるため、カラムで幅を制限する
+        col_budget, _ = st.columns([1, 1])
+        with col_budget:
+            budget_cap_m = st.slider(
+                "Budget Cap (Per Actor)", 
+                min_value=1, max_value=50, value=50, step=1, format="$%dM",
+                help="提案される各俳優の推定予算上限を設定します。このゲージを下げることで、予算オーバーの極端な高額A級スターを候補から弾くことができます。"
+            )
+        # バックエンドには(0.0, 1.0)の比率で渡す
+        guarantee_range = (0.0, budget_cap_m / 50.0)
+        
+        st.divider()
+        st.markdown("##### Intentions", help="AIが推薦ランキングを作成する際の「思考バイアス（意向）」です。複数を組み合わせることも可能です。")
+        
+        # 縦並びに変更
+        unexpected_casting = st.checkbox(
+            "Unexpected", 
+            help="過去に今回の役柄タイプ（Archetype）を演じた履歴を持つ俳優を【強制的に除外】して検索します。結果として「普段はこんなタイプの役をやらない俳優」が意外なハマり役として提案されやすくなります。"
+        )
+        blockbuster_focus = st.checkbox(
+            "Blockbuster",
+            help="役柄テキストの類似度よりも、俳優の過去の興行・実績スコアを最優先して選定します。\\n※「Unexpected」と同時にONにすることで、『超大物スター俳優を、彼らが普段絶対にやらないような異常な役回りにアサインする』といったユニークなキャスティングも可能です！"
+        )
             
     if st.button("Analyze Graph & Generate Casting Proposals", type="primary", use_container_width=True):
         if not plot_input or edited_df.empty:
@@ -209,8 +227,8 @@ with tab1:
                                 graph=graph,
                                 cast_constraints=cast_mapping,
                                 work_title=title_input,
-                                weight_similarity=weight_sim,
-                                weight_success=weight_succ,
+                                unexpected_casting=unexpected_casting,
+                                blockbuster_focus=blockbuster_focus,
                                 target_guarantee_range=guarantee_range
                             )
                             st.session_state.casting_results = results
@@ -239,18 +257,28 @@ with tab3:
         if not results:
             st.warning("キャスティング提案が見つかりませんでした。条件設定（Casting Constraints）を見直してください。")
         else:
-            for role_label, candidates in results.items():
+            for role_label, data in results.items():
                 st.subheader(f"{role_label}")
                 
+                candidates = data.get("candidates", [])
+                rationale = data.get("rationale", "")
+                
+                if rationale:
+                    st.info(f"💡 **AI Agent Recommendation Rationale:**\\n\\n{rationale}")
+                
                 if not candidates:
-                    st.info("この役柄の条件に合致する俳優が見つかりませんでした。")
+                    st.warning("条件に合致する俳優が見つかりませんでした。")
+                    st.divider()
                     continue
                     
                 cols = st.columns(len(candidates))
                 for i, c_data in enumerate(candidates):
                     with cols[i]:
                         st.markdown(f"### #{i+1} **{c_data['actor_name']}**")
-                        st.progress(min(1.0, c_data['final_score'] / 2.0), text=f"Match Score: {c_data['final_score']:.2f}")
+                        
+                        # Match score progress
+                        prog_val = min(1.0, max(0.0, float(c_data['final_score'])))
+                        st.progress(prog_val, text=f"Match Score: {c_data['final_score']:.2f}")
                         
                         st.caption("Score Breakdown")
                         st.markdown(f"""
@@ -259,7 +287,8 @@ with tab3:
                         - **Guarantee**: {c_data['guarantee_score']:.3f}
                         """)
                         
-                        st.info(f"**Past Role**: `{c_data['past_role']}` in \"{c_data['past_work_title']}\"")
+                        past_arch_str = f" ({c_data['past_archetype']})" if c_data.get('past_archetype') else ""
+                        st.markdown(f"**Past Role**: `{c_data['past_role']}`{past_arch_str}<br>in *\"{c_data['past_work_title']}\"*", unsafe_allow_html=True)
                 st.divider()
     else:
         st.info("AIからのキャスティング提案がここに表示されます。")
