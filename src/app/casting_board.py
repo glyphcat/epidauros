@@ -16,7 +16,6 @@ st.set_page_config(page_title="Epidauros AI Casting Agent", layout="wide", page_
 st.title("🎬 Epidauros (AI-Casting Board Agent)")
 st.markdown("""
 シナリオやプロットを入力し、登場人物の関係性を抽出して最適なキャストを提案するAIボードです。
-**あらすじ本文では、役名ではなく `$c1`, `$c2` といったIDを使って人物間の関係を記述してください。**
 """)
 
 # --- State Init ---
@@ -24,6 +23,11 @@ if "scenario_graph" not in st.session_state:
     st.session_state.scenario_graph = None
 if "casting_results" not in st.session_state:
     st.session_state.casting_results = None
+if "char_list" not in st.session_state:
+    st.session_state.char_list = [
+        {"id": "$c1", "role": "主人公", "suggest_casting": True, "already_cast": ""},
+        {"id": "$c2", "role": "賢者", "suggest_casting": True, "already_cast": ""}
+    ]
 
 # --- Visualization Function ---
 def render_graph(graph):
@@ -82,14 +86,30 @@ with tab1:
     col_plot, col_cast = st.columns([1.2, 1])
     
     with col_plot:
-        st.subheader("Story Plot", help="物語のあらすじを入力します。AIが関係性を正確に抽出できるよう、具体的な役名ではなく「$c1 は $c2 を裏切った」のようにID記法を用いて記述してください。")
+        st.subheader("Story Plot", help="物語のあらすじを入力します。右の「Characters List」に登録した名前が入力されると、下部にリアルタイムでプレビューハイライトが表示されます。")
         title_input = st.text_input("Project Title", value="Untitled Project")
+        
         plot_input = st.text_area(
-            "Plot Text", 
-            height=300,
-            value="$c1 は平和な農村に暮らす若者。ある日、$c2 が現れ、$c1 に秘められた力があることを伝える。",
-            help="登場人物は名前そのものではなく、$c1や$c2という表記を使って関係性を書いてください。"
+            "Plot Text (入力欄外をクリックすると下部のLive Previewへ即座に反映されます)", 
+            height=250,
+            value="主人公 は平和な農村に暮らす若者。ある日、賢者 が現れ、主人公 に秘められた力があることを伝える。"
         )
+        
+        st.caption("Live Preview")
+        preview_text = plot_input
+        # 色分け定義
+        colors = ["#FF4B4B", "#1E90FF", "#32CD32", "#FF9800", "#9C27B0", "#E91E63", "#00BCD4", "#FFC107"]
+        
+        for i, char in enumerate(st.session_state.char_list):
+            role = char['role']
+            if not role:
+                continue
+            
+            # Suggest対象かどうかで色を変える（対象外はグレー）
+            bg_color = colors[i % len(colors)] if char['suggest_casting'] else "#555555"
+            preview_text = preview_text.replace(role, f'<span style="background-color:{bg_color}; color:white; padding:2px 6px; border-radius:4px; font-weight:bold;">{role}</span>')
+            
+        st.markdown(f'<div style="padding:15px; border:1px solid #444; border-radius:5px; background-color:#1e1e1e; min-height:100px; line-height:1.6;">{preview_text}</div>', unsafe_allow_html=True)
         
     with col_cast:
         st.subheader("Characters List", help="登場人物の定義一覧です。AIからの配役提案が欲しいキャラクターは「Suggest?」にチェックを入れてください。")
@@ -134,19 +154,12 @@ with tab1:
         """, unsafe_allow_html=True)
         st.markdown('<div class="char-list-container" style="display:none;"></div>', unsafe_allow_html=True)
         
-        # リスト型でのステート管理に変更
-        if "char_list" not in st.session_state:
-            st.session_state.char_list = [
-                {"id": "$c1", "role": "主人公", "suggest_casting": True, "already_cast": ""},
-                {"id": "$c2", "role": "賢者", "suggest_casting": True, "already_cast": ""}
-            ]
-            
         # 表のヘッダー風レイアウト
         h_cols = st.columns([1.5, 3, 2, 3, 1])
-        h_cols[0].markdown("**ID**")
-        h_cols[1].markdown("**Role Name**")
-        h_cols[2].markdown("**Suggest?**")
-        h_cols[3].markdown("**Already Cast**")
+        h_cols[0].markdown("**ID**", help="プロット本文でこのキャラクターを呼び出すための記号です。")
+        h_cols[1].markdown("**Character Name**", help="キャラクターの名前や役職を入力します。")
+        h_cols[2].markdown("**Suggest?**", help="このキャラクターに対してAIのキャスティング提案を求める場合はチェックを入れます。")
+        h_cols[3].markdown("**Already Cast**", help="既に配役が決定している場合、その俳優名を入力します（AIはこれに基づいてバランスを取ります）。")
         
         # 各行の描画
         for i, char in enumerate(st.session_state.char_list):
@@ -209,10 +222,19 @@ with tab1:
                 try:
                     cast_mapping = edited_df.to_dict(orient="records")
                     
+                    # --- AIへの裏側変換処理 (Entity Masking) ---
+                    # ユーザーが入力した自然なテキストから、定義されたキャラクター名を抽出し
+                    # $c1 などの内部IDに置換してからLLMへ食わせる（エラーと揺らぎの完全防止）
+                    internal_plot_text = plot_input
+                    # 長い名前から先に置換する（「太郎」が「桃太郎」を部分置換してしまうのを防ぐ）
+                    sorted_chars = sorted([c for c in cast_mapping if c['role']], key=lambda x: len(x['role']), reverse=True)
+                    for char in sorted_chars:
+                        internal_plot_text = internal_plot_text.replace(char['role'], char['id'])
+                    
                     generator = GraphGenerator(model_name="gpt-4o", temperature=0.0)
                     graph = generator.generate(
                         title=title_input,
-                        plot_text=plot_input,
+                        plot_text=internal_plot_text,
                         cast_mapping=cast_mapping,
                         pre_mentioned=True
                     )
