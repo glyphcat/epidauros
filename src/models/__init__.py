@@ -1,3 +1,4 @@
-from .scenario_structure import CharacterNode, RelationEdge, ScenarioGraph
+from .db_orm import Actor, Work, Performance
+from .scenario_structure import ScenarioGraph, CharacterNode, RelationEdge
 
-__all__ = ["CharacterNode", "RelationEdge", "ScenarioGraph"]
+__all__ = ["Actor", "Work", "Performance", "ScenarioGraph", "CharacterNode", "RelationEdge"]
