@@ -21,4 +21,4 @@ ENV PYTHONUNBUFFERED=1
 
 COPY src/ ./src/
 
-CMD ["python", "src/main.py"]
+CMD ["streamlit", "run", "src/app/casting_board.py", "--server.address", "0.0.0.0"]

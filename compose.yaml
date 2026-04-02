@@ -7,7 +7,6 @@ services:
       - /app/.venv
     ports:
       - "8501:8501"
-    command: sleep infinity
     env_file:
       - .env
     environment:
