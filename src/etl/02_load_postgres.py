@@ -35,7 +35,7 @@ def load_data(db: Session, limit: int = None, dry_run: bool = False):
             
             try:
                 data_dict = json.loads(line)
-                # Pydanticバリデーション
+                # Pydantic validation
                 record = ExtractedRecordSchema(**data_dict)
             except (json.JSONDecodeError, ValidationError) as e:
                 logger.warning(f"Validation error on line {line_num}: {e}")
@@ -107,7 +107,7 @@ def load_data(db: Session, limit: int = None, dry_run: bool = False):
                 source_situations = []
                 target_situations = []
                 
-                # 役名を元に graph のノードIDを探す
+                # Find node ID in graph based on character role
                 node_id = None
                 for node in record.scenario_graph_data.nodes:
                     if node['actor_name'] == cast_data.actor or node['role_name'] == cast_data.role:
@@ -121,12 +121,12 @@ def load_data(db: Session, limit: int = None, dry_run: bool = False):
                         if edge['target_node_id'] == node_id:
                             target_situations.append(edge['situation_id'])
                             
-                # 重複排除
+                # Remove duplicates
                 source_situations = list(set(source_situations))
                 target_situations = list(set(target_situations))
                 
                 # 2.C Performance Upsert
-                # N/A などのバリデーション（テーブル制約への対応）
+                # Validation for guarantee_rank
                 g_rank = cast_data.guarantee_rank
                 if g_rank not in ('S', 'A', 'B', 'C', 'N/A'):
                     g_rank = 'N/A'

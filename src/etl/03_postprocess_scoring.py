@@ -28,7 +28,7 @@ WEIGHTS = [1.0, 0.8, 0.6, 0.4, 0.2]
 def calculate_scores(db):
     logger.info("Starting scoring calculation...")
     
-    # --- 1. Calc Decade Box Office Baselines ---
+    # --- 1. Calculate Decade Box Office Baselines ---
     works = db.query(Work).all()
     decade_box_office = {}
     
@@ -56,7 +56,7 @@ def calculate_scores(db):
         
         base_score = 0.5  # default/median baseline
         if work.box_office and decade in decade_baselines and decade_baselines[decade] > 0:
-            # 正規化: Maxの半分を平均的ヒットと考え 0.5~1.0 にスケーリング
+            # Normalization: Scale relative to the median hit of the decade
             ratio = float(work.box_office) / (decade_baselines[decade] * 0.5)
             base_score = min(1.0, ratio) * 0.5 + 0.5
             

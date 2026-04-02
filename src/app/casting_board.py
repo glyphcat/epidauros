@@ -46,17 +46,17 @@ def render_graph(graph):
     nodes = []
     edges = []
     
-    # ユーザーリクエストに合わせて全体を黒・オレンジ・グレーを基調としたクールな配色に変更
+    # キャラクター・アーキタイプに基づくカラーマップ
     color_map = {
-        "HERO": "#1E90FF",                # ドジャーブルー（主人公らしい青）
-        "MENTOR": "#32CD32",              # ライムグリーン（導き手）
-        "SHADOW": "#FF4500",              # オレンジレッド（敵役の緊張感）
-        "ALLY": "#87CEFA",                # ライトスカイブルー（相棒）
-        "HERALD": "#DA70D6",              # オーキッド（使者）
-        "THRESHOLD_GUARDIAN": "#708090",  # スレートグレー（門番）
-        "SHAPESHIFTER": "#FFD700",        # ゴールド（変幻自在）
-        "TRICKSTER": "#FF69B4",           # ホットピンク（トリックスター）
-        "NOT_MENTIONED": "#555555"        # グレー
+        "HERO": "#1E90FF",                # Hero
+        "MENTOR": "#32CD32",              # Mentor
+        "SHADOW": "#FF4500",              # Shadow/Villain
+        "ALLY": "#87CEFA",                # Ally
+        "HERALD": "#DA70D6",              # Herald
+        "THRESHOLD_GUARDIAN": "#708090",  # Threshold Guardian
+        "SHAPESHIFTER": "#FFD700",        # Shapeshifter
+        "TRICKSTER": "#FF69B4",           # Trickster
+        "NOT_MENTIONED": "#555555"        # Not Mentioned
     }
     
     for n in graph.nodes:
@@ -88,7 +88,7 @@ def render_graph(graph):
         hierarchical=False,
         nodeHighlightBehavior=True,
         highlightColor="#FFB347",
-        # 物理シミュレーションを強化して中心に集まるように調整
+        # グラフの物理シミュレーション設定
         repulsion={'nodeDistance': 200, 'centralGravity': 0.3, 'springLength': 200, 'springConstant': 0.05},
         solver='repulsion',
     )
@@ -132,7 +132,7 @@ with tab1:
 
     st.caption("登場人物を定義してください。各種属性（性別・年齢層）を入力した場合、キャスティングの参考情報として使用されます。（※指定なし=Any）")
     
-    # --- 超強力なカスタムCSS注入 ---
+    # --- Custom CSS ---
     st.markdown("""
     <style>
     /* 1. 行間の徹底的な圧縮 */
@@ -260,7 +260,7 @@ with tab1:
         guarantee_range = (0.0, budget_cap_m / 50.0)
         
         st.divider()
-        st.markdown("##### Intentions", help="AIが推薦ランキングを作成する際の「思考バイアス（意向）」です。複数を組み合わせることも可能です。")
+        st.markdown("##### Intentions", help="AIが推薦ランキングを作成する際の探索オプションです。")
         
         # 縦並びに変更
         unexpected_casting = st.checkbox(
@@ -280,9 +280,8 @@ with tab1:
                 try:
                     cast_mapping = edited_df.to_dict(orient="records")
                     
-                    # --- AIへの裏側変換処理 (Entity Masking) ---
-                    # ユーザーが入力した自然なテキストから、定義されたキャラクター名を抽出し
-                    # $c1 などの内部IDに置換してからLLMへ食わせる（エラーと揺らぎの完全防止）
+                    # --- Entity Masking ---
+                    # ユーザーが入力したテキストのキャラクター名を内部IDに置換し、LLMの解釈精度を向上させます
                     internal_plot_text = plot_input
                     # 長い名前から先に置換する（「太郎」が「桃太郎」を部分置換してしまうのを防ぐ）
                     sorted_chars = sorted([c for c in cast_mapping if c['role']], key=lambda x: len(x['role']), reverse=True)

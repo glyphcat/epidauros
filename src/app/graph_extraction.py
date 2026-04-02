@@ -8,20 +8,12 @@ from pyvis.network import Network
 from src.core import GraphGenerator
 
 
-# --- 可視化関数の定義 ---
+# --- Visualization helper ---
 def visualize_graph(scenario_graph):
     """ScenarioGraphオブジェクトをPyvisで可視化し表示する"""
     net = Network(height="500px", width="100%", directed=True)
 
     for node in scenario_graph.nodes:
-        # color_map = {
-        #     "HERO": "#ff4b4b", "MENTOR": "#4b4bff", "SHADOW": "#333333",
-        #     "ALLY": "#4bff4b", "HERALD": "#ffff4b", "THRESHOLD_GUARDIAN": "#ff9900"
-        # }
-        # node_color = color_map.get(node.archetype_id, "#999999")
-        label = f"{node.role_name}\n({node.archetype_id})"
-        title = f"Actor: {node.actor_name}\n{node.description}"
-        # net.add_node(node.node_id, label=label, title=title, color=node_color, shape="ellipse")
         net.add_node(node.node_id, label=label, title=title, shape="ellipse")
 
     for edge in scenario_graph.edges:
@@ -37,12 +29,10 @@ def visualize_graph(scenario_graph):
 
     components.html(html_string, height=550)
 
-# --- UI構築 ---
+# --- UI Construction ---
 st.set_page_config(page_title="Graph Extraction Test", layout="wide")
 st.title("🎬 Scenario Graph Extraction Test")
-st.info(
-    "あらすじからキャラクターアーキタイプと劇的状況を抽出するプロトタイプ画面です。"
-)
+st.info("Extracts character archetypes and dramatic situations from plot summaries.")
 
 
 with st.sidebar:
@@ -74,8 +64,8 @@ with col_config:
     cast_input = st.text_area("Cast JSON", value=json.dumps(default_cast, indent=2), height=350)
 
 
-# --- 実行ロジック ---
-# セッション状態の初期化
+# --- Execution logic ---
+# State initialization
 if "extraction_result" not in st.session_state:
     st.session_state.extraction_result = None
 
@@ -88,13 +78,12 @@ if st.button("Generate Graph Structure", type="primary", use_container_width=Tru
             with st.spinner("Analyzing scenario structure with LLM..."):
                 cast_mapping = json.loads(cast_input)
                 result = generator.generate(title, plot_text, cast_mapping)
-                # 結果をセッションに保存
                 st.session_state.extraction_result = result
 
         except Exception as e:
             st.error(f"Error: {e}")
 
-# 結果がセッションに存在する場合に表示（ダウンロード後の再実行でもここが呼ばれる）
+# Display results if available in session
 if st.session_state.extraction_result:
     result = st.session_state.extraction_result
 

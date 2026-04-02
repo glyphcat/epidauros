@@ -45,9 +45,8 @@ class AgentState(TypedDict):
 
 class CastingAgent:
     """
-    抽出されたシナリオグラフとユーザーの制約をもとに、
-    Qdrant (ベクトル) と PostgreSQL (実績スコア) をLangGraphのループで推論し、
-    最適な俳優とその論理的な推薦理由を提案するエージェント。
+    Casting Agent that suggests actors based on scenario graphs and user constraints.
+    Uses LangGraph for iterative reasoning involving Qdrant (Vector) and PostgreSQL (Relational).
     """
     
     def __init__(self, db: Session):
@@ -112,7 +111,7 @@ class CastingAgent:
                 else:
                     gender_score = 0.2       # mismatch: heavy penalty, NOT exclusion
             
-            # Age: buffer-based distance penalty
+            # Age: Buffer-based distance penalty
             age_score = 1.0
             age = None
             if actor.birth_date is not None:
@@ -131,7 +130,7 @@ class CastingAgent:
             
             demographic_score = (gender_score + age_score) / 2.0
 
-            # Soft Intent: Unexpectedness filter (archetype mismatch stays hard)
+            # Soft Intent: Unexpectedness filter
             past_archetype = ""
             if state["unexpected_casting"]:
                 if perf.work and perf.work.scenario_graph_data:
@@ -166,7 +165,7 @@ class CastingAgent:
 
 
     def _observe_node(self, state: AgentState) -> dict:
-        """フィルター結果を観察し、候補が枯渇していればリトライ用のパラメーターを更新する"""
+        """Updates search parameters if candidates are scarce."""
         cands = state["filtered_candidates"]
         iteration = state["iteration"] + 1
         
@@ -175,7 +174,7 @@ class CastingAgent:
             return {"iteration": iteration, "fetch_limit": state["fetch_limit"] + 50}
             
         # スコア計算: 類似度・興行スコアにDemographic Softスコアを乗算
-        # Demographic mismatch reduces the overall score, but doesn't zero it out.
+        # Demographic mismatch reduces the overall score.
         w_sim = 0.2 if state["blockbuster_focus"] else 0.6
         w_succ = 0.7 if state["blockbuster_focus"] else 0.25
         w_demo = 0.1 if state["blockbuster_focus"] else 0.15
@@ -191,7 +190,7 @@ class CastingAgent:
         return {"iteration": iteration, "final_proposals": cands[:3]}
 
     def _router(self, state: AgentState) -> str:
-        """条件次第で次フェーズか再検索かをルーティング"""
+        """Routes to next phase or retry search."""
         if state.get("final_proposals") is not None and len(state["final_proposals"]) >= 0:
             return "generate"
         if state["iteration"] >= 3:
@@ -199,7 +198,7 @@ class CastingAgent:
         return "retrieve"
 
     def _generate_node(self, state: AgentState) -> dict:
-        """RAG技術を用いて、構造や制約に基づいた推薦理由をテキスト化する"""
+        """Generates recommendation rationale using RAG."""
         if not state.get("final_proposals"):
             return {"rationale": "事前設定された予算（Guarantee Score）により、検索範囲内で適合する俳優が見つかりませんでした。制約を緩和して再度お試しください。"}
             
@@ -241,10 +240,7 @@ class CastingAgent:
         blockbuster_focus: bool = False,
         target_guarantee_range: tuple = (0.0, 1.0)
     ) -> Dict[str, Dict[str, Any]]:
-        """
-        各キャラクターに対するキャスト提案とRationaleを返す。
-        戻り値: { "$c1 (RoleName)": {"candidates": [...], "rationale": "..." }, ... }
-        """
+        """Returns casting proposals and rationales for each character."""
         results = {}
         target_casts = { c.get("id"): c for c in cast_constraints if c.get("suggest_casting", False) }
         if not target_casts:

@@ -21,7 +21,7 @@ BASE_DELAY_SEC = 2.0
 
 
 def get_processed_ids(output_path: str) -> Set[str]:
-    """既に処理済みのデータのIDを取得する。"""
+    """Gets IDs of already processed records from the output file."""
     processed_ids = set()
     if os.path.exists(output_path):
         with open(output_path, "r", encoding="utf-8") as f:
@@ -40,7 +40,7 @@ def get_processed_ids(output_path: str) -> Set[str]:
 def run_extraction(max_records: int = None):
     logger.info("Starting LLM extraction batch...")
 
-    # 1. データの読み込み
+    # 1. Load data
     try:
         with open(INPUT_FILE, "r", encoding="utf-8") as f:
             datasets = json.load(f)
@@ -48,17 +48,17 @@ def run_extraction(max_records: int = None):
         logger.error(f"Input file not found: {INPUT_FILE}")
         return
 
-    # 2. 処理済みIDの確認
+    # 2. Check processed IDs
     processed_ids = get_processed_ids(OUTPUT_FILE)
     logger.info(f"Loaded {len(datasets)} records. Already processed: {len(processed_ids)}.")
 
-    # 出力先ディレクトリの確保
+    # Ensure output directory exists
     os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
 
-    # 3. モデルの初期化 (gpt-4o)
+    # 3. Initialize model (gpt-4o)
     extractor = GraphGenerator(model_name="gpt-4o", temperature=0.0)
 
-    # 4. 未処理レコードの処理
+    # 4. Process unprocessed records
     processed_count = 0
     with open(OUTPUT_FILE, "a", encoding="utf-8") as f_out:
         for item in datasets:
@@ -80,16 +80,16 @@ def run_extraction(max_records: int = None):
                 
             cast_mapping = item.get("cast_mapping", [])
 
-            # リトライ処理
+            # Retry logic with exponential backoff
             success = False
             for attempt in range(1, MAX_RETRIES + 1):
                 try:
-                    # GraphGenerator.generate() を呼び出し構造化データを取得
+                    # Call GraphGenerator to extract structured data
                     graph_result = extractor.generate(
                         title=title, plot_text=plot_text, cast_mapping=cast_mapping
                     )
 
-                    # 成果物を1つのJSON形式（dict）にまとめる
+                    # Prepare the output dictionary
                     result_data = {
                         "external_id": ext_id,
                         "title": title,
@@ -101,7 +101,7 @@ def run_extraction(max_records: int = None):
                         "original_cast_mapping": cast_mapping,
                     }
 
-                    # JSONLとして1行追記
+                    # Append to JSONL
                     f_out.write(json.dumps(result_data, ensure_ascii=False) + "\n")
                     f_out.flush()
                     

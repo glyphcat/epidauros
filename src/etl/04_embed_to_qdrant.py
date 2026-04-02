@@ -22,7 +22,7 @@ def embed_data(db: Session, limit: int = None):
     logger.info(f"Connecting to Qdrant at {QDRANT_HOST}:{QDRANT_PORT}")
     qdrant = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
     
-    # --- 1. Process Works (作品のベクトル化) ---
+    # --- 1. Process Works (Vectorize works) ---
     works = db.query(Work).all()
     if limit:
         works = works[:limit]
@@ -36,7 +36,7 @@ def embed_data(db: Session, limit: int = None):
         nodes_desc = "; ".join([f"{n.get('role_name', n.get('actor_name'))} ({n.get('archetype', 'Unknown')})" for n in work.scenario_graph_data.get('nodes', [])])
         edges_desc = "; ".join([f"{e.get('source_node_id')} -> {e.get('target_node_id')} [{e.get('situation_id', 'Unknown')}] reason: {e.get('reason', '')}" for e in work.scenario_graph_data.get('edges', [])])
         
-        # 意味を捉えやすいようにシリアライズしたテキスト
+        # Serialize text for embedding
         text_to_embed = f"""Title: {work.title}
 Period: {work.setting_period}
 Location: {work.setting_location}
@@ -45,7 +45,7 @@ Characters: {nodes_desc}
 Plot Dynamics: {edges_desc}
 Full Plot Preview: {work.plot_full[:500]}..."""
         
-        # UUIDがなければ新規発行（既にあれば更新）
+        # Ensure plot_embedding_id existence
         if not work.plot_embedding_id:
             work.plot_embedding_id = str(uuid.uuid4())
             
@@ -70,7 +70,7 @@ Full Plot Preview: {work.plot_full[:500]}..."""
     db.commit()
     logger.info("Finished embedding works.")
 
-    # --- 2. Process Performances (役柄のベクトル化) ---
+    # --- 2. Process Performances (Vectorize roles) ---
     performances = db.query(Performance).all()
     if limit:
         performances = performances[:limit * 10]  # rough limit scaling
@@ -81,7 +81,7 @@ Full Plot Preview: {work.plot_full[:500]}..."""
         if not perf.work.scenario_graph_data:
             continue
             
-        # シナリオグラフからこの役柄の性格（Archetype, Description）を抜き出す
+        # Extract role characteristics (Archetype, Description) from scenario graph
         char_desc = ""
         archetype = ""
         for n in perf.work.scenario_graph_data.get('nodes', []):

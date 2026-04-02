@@ -1,14 +1,6 @@
 """
-graph_generator.py
-
-description:
-このモジュールは、自然言語で与えられたシナリオ情報について以下の処理を行う。
-
-- 入力: あらすじ(text) + 配役(Actor/Roleペアのリスト)
-- プロンプト作成：グラフ構造抽出のためのプロンプトを組み立てる。
-- ノード同定: 配役リストの各人物を、8つの CharacterArchetype のいずれかに分類。
-- エッジ抽出: 人物間の関係を、36の SituationArchetype のいずれかに分類。
-- 出力: Pydanticでバリデーションされた、JSONB格納用の構造化データ。
+Graph Generator Module
+Extracts character nodes and dramatic situation edges from natural language plot summaries.
 """
 
 import re
@@ -28,7 +20,7 @@ from src.models.situation_archetypes import ALL_SITUATIONS_ARCHETYPES
 
 class GraphGenerator:
     """
-    あらすじとキャスト情報から、物語のグラフ構造（ScenarioGraph）を抽出するクラス。
+    Extracts a ScenarioGraph from plot summaries and cast information using LLM structured output.
     """
 
     def __init__(self, model_name="gpt-4o", temperature=0.0):
@@ -40,7 +32,7 @@ class GraphGenerator:
         self.structured_llm = self.llm.with_structured_output(ScenarioGraph)
 
     def _build_archetypes_str(self) -> tuple[str, str]:
-        """プロンプト用のアーキタイプ文字列を生成"""
+        """Generates archetype description strings for the prompt."""
         char_lines = [
             f"- **{arch.id}**: {arch.short_summary}"
             for arch in ALL_CHARACTER_ARCHETYPES
@@ -55,8 +47,8 @@ class GraphGenerator:
         self, title: str, plot_text: str, cast_mapping: List[Dict[str, Any]], pre_mentioned: bool = False
     ) -> ScenarioGraph:
         """
-        与えられた作品情報からグラフ構造を生成する。
-        pre_mentioned=True の場合、plot_text には既に $c1 などのIDが埋め込まれている前提で処理する。
+        Generates a graph structure from the given plot and cast mapping.
+        If pre_mentioned is True, the plot_text is assumed to contain mention IDs like $c1.
         """
         # --- 1. 前処理：メンションマッピングとあらすじの置換 ---
         mention_mapping = {}
