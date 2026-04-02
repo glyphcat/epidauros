@@ -3,9 +3,7 @@ import pandas as pd
 import os
 from dotenv import load_dotenv
 
-from src.core.graph_generator import GraphGenerator
-from src.core.casting_agent import CastingAgent
-from src.core.database import SessionLocal
+from src.core import GraphGenerator, CastingAgent, SessionLocal
 from streamlit_agraph import agraph, Node, Edge, Config
 
 load_dotenv()
@@ -23,11 +21,23 @@ if "scenario_graph" not in st.session_state:
     st.session_state.scenario_graph = None
 if "casting_results" not in st.session_state:
     st.session_state.casting_results = None
+if "project_title" not in st.session_state:
+    st.session_state.project_title = "Untitled Project"
+if "plot_text" not in st.session_state:
+    st.session_state.plot_text = "主人公 は平和な農村に暮らす若者。ある日、賢者 が現れ、主人公 に秘められた力があることを伝える。"
 if "char_list" not in st.session_state:
     st.session_state.char_list = [
         {"id": "$c1", "role": "主人公", "target_gender": "Any", "target_age": "Any", "suggest_casting": True, "already_cast": ""},
         {"id": "$c2", "role": "賢者", "target_gender": "Any", "target_age": "Any", "suggest_casting": True, "already_cast": ""}
     ]
+    # 初期起動時にウィジェット用のキーを個別に初期化
+    for i, char in enumerate(st.session_state.char_list):
+        st.session_state[f"role_{i}"] = char["role"]
+        st.session_state[f"gen_{i}"] = char["target_gender"]
+        st.session_state[f"age_{i}"] = char["target_age"]
+        st.session_state[f"sugg_{i}"] = char["suggest_casting"]
+        st.session_state[f"cast_{i}"] = char["already_cast"]
+
 if "fb_log" not in st.session_state:
     st.session_state.fb_log = {}
 
@@ -97,10 +107,27 @@ with tab1:
             st.session_state.scenario_graph = None
             st.session_state.casting_results = None
             st.session_state.fb_log = {}
+            st.session_state.project_title = ""
+            st.session_state.plot_text = ""
+            
+            # リストを空の状態で再定義
             st.session_state.char_list = [
-                {"id": "$c1", "role": "主人公", "target_gender": "Any", "target_age": "Any", "suggest_casting": True, "already_cast": ""},
-                {"id": "$c2", "role": "賢者", "target_gender": "Any", "target_age": "Any", "suggest_casting": True, "already_cast": ""}
+                {"id": "$c1", "role": "", "target_gender": "Any", "target_age": "Any", "suggest_casting": True, "already_cast": ""},
+                {"id": "$c2", "role": "", "target_gender": "Any", "target_age": "Any", "suggest_casting": True, "already_cast": ""}
             ]
+            
+            # 個別のウィジェットキーも明示的に空にする
+            # (Streamlitでは key に紐づく値を直接操作するのが最も確実です)
+            for key in list(st.session_state.keys()):
+                if key.startswith("role_"):
+                    st.session_state[key] = ""
+                elif key.startswith("gen_") or key.startswith("age_"):
+                    st.session_state[key] = "Any"
+                elif key.startswith("sugg_"):
+                    st.session_state[key] = True
+                elif key.startswith("cast_"):
+                    st.session_state[key] = ""
+            
             st.rerun()
 
     st.caption("登場人物を定義してください。各種属性（性別・年齢層）を入力した場合、キャスティングの参考情報として使用されます。（※指定なし=Any）")
@@ -108,7 +135,7 @@ with tab1:
     # --- 超強力なカスタムCSS注入 ---
     st.markdown("""
     <style>
-    /* 1. 行間の徹底的な圧縮 (Gapゼロ化 ＆ マージン削減) */
+    /* 1. 行間の徹底的な圧縮 */
     div[data-testid="column"]:has(.char-list-container) div[data-testid="stVerticalBlock"] {
         gap: 0px !important;
     }
@@ -161,11 +188,13 @@ with tab1:
     for i, char in enumerate(st.session_state.char_list):
         cols = st.columns([1, 2.5, 1.5, 1.5, 1.2, 2.5, 0.8])
         cols[0].text_input("id", value=char["id"], disabled=True, key=f"id_{i}", label_visibility="collapsed")
-        char["role"] = cols[1].text_input("role", value=char["role"], key=f"role_{i}", label_visibility="collapsed")
-        char["target_gender"] = cols[2].selectbox("gender", options=gender_options, index=gender_options.index(char.get("target_gender", "Any")), key=f"gen_{i}", label_visibility="collapsed")
-        char["target_age"] = cols[3].selectbox("age", options=age_options, index=age_options.index(char.get("target_age", "Any")), key=f"age_{i}", label_visibility="collapsed")
-        char["suggest_casting"] = cols[4].checkbox("Yes", value=char["suggest_casting"], key=f"sugg_{i}")
-        char["already_cast"] = cols[5].text_input("already", value=char["already_cast"], key=f"cast_{i}", label_visibility="collapsed")
+        
+        # value引数を外し、keyのみで管理することで警告を回避
+        char["role"] = cols[1].text_input("role", key=f"role_{i}", label_visibility="collapsed")
+        char["target_gender"] = cols[2].selectbox("gender", options=gender_options, key=f"gen_{i}", label_visibility="collapsed")
+        char["target_age"] = cols[3].selectbox("age", options=age_options, key=f"age_{i}", label_visibility="collapsed")
+        char["suggest_casting"] = cols[4].checkbox("Yes", key=f"sugg_{i}")
+        char["already_cast"] = cols[5].text_input("already", key=f"cast_{i}", label_visibility="collapsed")
         
         # 削除ボタン
         if cols[6].button("➖", key=f"del_{i}"):
@@ -174,10 +203,17 @@ with tab1:
             
     # 追加ボタン
     if st.button("➕", key="add_char"):
-        next_id = f"$c{len(st.session_state.char_list) + 1}"
-        st.session_state.char_list.append(
-            {"id": next_id, "role": "", "target_gender": "Any", "target_age": "Any", "suggest_casting": True, "already_cast": ""}
-        )
+        next_idx = len(st.session_state.char_list)
+        next_id = f"$c{next_idx + 1}"
+        new_char = {"id": next_id, "role": "", "target_gender": "Any", "target_age": "Any", "suggest_casting": True, "already_cast": ""}
+        st.session_state.char_list.append(new_char)
+        
+        # 新しい行のウィジェット状態を初期化
+        st.session_state[f"role_{next_idx}"] = ""
+        st.session_state[f"gen_{next_idx}"] = "Any"
+        st.session_state[f"age_{next_idx}"] = "Any"
+        st.session_state[f"sugg_{next_idx}"] = True
+        st.session_state[f"cast_{next_idx}"] = ""
         st.rerun()
         
     # Analysis用に df 形式に変換しておく
@@ -186,12 +222,12 @@ with tab1:
     st.divider()
     
     st.subheader("Story Plot", help="物語のあらすじを入力します。上の「Characters List」に登録した名前が入力されると、下部にリアルタイムでプレビューハイライトが表示されます。")
-    title_input = st.text_input("Project Title", value="Untitled Project")
+    title_input = st.text_input("Project Title", key="project_title")
     
     plot_input = st.text_area(
         "Plot Text (入力欄外をクリックすると下部のLive Previewへ即座に反映されます)", 
         height=250,
-        value="主人公 は平和な農村に暮らす若者。ある日、賢者 が現れ、主人公 に秘められた力があることを伝える。"
+        key="plot_text"
     )
     
     st.caption("Live Preview")
